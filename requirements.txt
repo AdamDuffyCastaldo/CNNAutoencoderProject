@@ -1,0 +1,29 @@
+# Core
+numpy
+scipy
+matplotlib
+
+# Deep Learning
+torch
+torchvision
+
+# Image Processing
+Pillow
+scikit-image
+
+# SAR/Geospatial
+rasterio
+
+# Compression
+PyWavelets
+
+# Jupyter
+jupyter
+ipykernel
+
+# Experiment Tracking
+tensorboard
+
+# Utilities
+tqdm
+pyyaml
