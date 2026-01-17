@@ -33,7 +33,7 @@ source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 ```
 
-## Progress
+## Learning Progress
 
 ### Phase 1: Compression Fundamentals
 - [ ] 1.1 Information Theory
