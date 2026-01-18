@@ -51,29 +51,6 @@ def handle_invalid_values(
     raise NotImplementedError("TODO: Implement invalid value handling")
 
 
-def to_db(
-    intensity: np.ndarray,
-    floor_db: float = -50
-) -> np.ndarray:
-    """
-    Convert intensity to decibels.
-    
-    Formula: dB = 10 × log₁₀(intensity)
-    
-    Args:
-        intensity: Linear intensity values
-        floor_db: Minimum dB value (prevents -inf)
-    
-    Returns:
-        Image in dB scale
-    """
-    # TODO: Implement dB conversion
-    #
-    # db = 10 * np.log10(intensity)
-    # db = np.maximum(db, floor_db)
-    # return db
-    
-    raise NotImplementedError("TODO: Implement dB conversion")
 
 
 def from_db(db: np.ndarray) -> np.ndarray:
@@ -136,146 +113,191 @@ def compute_clip_bounds(
     raise NotImplementedError("TODO: Implement clip bounds computation")
 
 
-def preprocess_sar_image(
-    image: np.ndarray,
-    vmin: Optional[float] = None,
-    vmax: Optional[float] = None,
-    clip_percentiles: Tuple[float, float] = (1, 99)
-) -> Tuple[np.ndarray, Dict]:
+def preprocess_sar_complete(image, vmin=None, vmax=None, clip_percentiles=(1, 99)):
     """
-    Complete preprocessing pipeline for SAR image.
-    
-    Steps:
-    1. Handle invalid values
-    2. Convert to dB
-    3. Determine clip bounds (if not provided)
-    4. Clip outliers
-    5. Normalize to [0, 1]
-    
-    Args:
-        image: Raw SAR intensity image
-        vmin: Lower clip bound in dB (computed if None)
-        vmax: Upper clip bound in dB (computed if None)
-        clip_percentiles: Percentiles for automatic clip bounds
-    
+    Complete preprocessing pipeline for SAR images.
+        
     Returns:
-        normalized: Image in [0, 1] range
-        params: Dict with preprocessing parameters for inverse transform
-    
-    Example:
-        >>> normalized, params = preprocess_sar_image(raw_image)
-        >>> # Save params for later inverse transform
-        >>> np.save('preprocess_params.npy', params)
+        normalized: Image normalized to [0, 1]
+        params: Dict with parameters needed for inverse transform
     """
-    # TODO: Implement complete preprocessing pipeline
-    #
     # Step 1: Handle invalid values
-    # Step 2: Convert to dB
-    # Step 3: Determine clip bounds
-    # Step 4: Clip
-    # Step 5: Normalize to [0, 1]
-    # Return normalized image and params dict
+    invalid_mask = (
+        (image <= 0) | 
+        np.isnan(image) | 
+        np.isinf(image)
+    )
+    image_clean = np.copy(image)
+    noise_floor = 1e-10
+    image_clean = np.where(image <= 0, noise_floor, image_clean)
+    image_clean = np.where(np.isnan(image_clean), noise_floor, image_clean)
+    image_clean = np.where(np.isinf(image_clean), noise_floor, image_clean)
+
     
-    raise NotImplementedError("TODO: Implement preprocessing pipeline")
+    
+    # Step 2: Convert to dB
+    image_db = 10 * np.log10(image_clean)
+    image_db = np.maximum(image_db, noise_floor)
+    
+    
+    # Step 3: Determine clip bounds
+    if vmin is None or vmax is None:
+        valid_db = image_db
+        if vmin is None:
+            vmin = np.percentile(valid_db, clip_percentiles[0])
+        if vmax is None:
+            vmax = np.percentile(valid_db, clip_percentiles[1])
+    
+    # Step 4: Clip
+    image_clipped = np.clip(image_db, vmin, vmax)
+    
+    # Step 5: Normalize to [0, 1]
+    normalized = (image_clipped - vmin) / (vmax - vmin)
+    
+    # Store parameters for inverse transform
+    params = {
+        'vmin': vmin,
+        'vmax': vmax,
+        'invalid_mask': invalid_mask
+    }
+    
+    return normalized, params
 
 
-def inverse_preprocess(
-    normalized: np.ndarray,
-    params: Dict
-) -> np.ndarray:
+def inverse_preprocess(normalized, params):
     """
-    Inverse preprocessing: convert [0,1] back to linear intensity.
+    Inverse preprocessing: convert [0, 1] normalized image back to linear intensity.
     
     Args:
         normalized: Normalized image in [0, 1]
-        params: Preprocessing parameters from preprocess_sar_image
-    
+        params: Parameters from preprocess_sar_complete
+        
     Returns:
-        Linear intensity image
-    
-    Example:
-        >>> reconstructed = inverse_preprocess(model_output, params)
+        image_linear: Reconstructed linear intensity
     """
-    # TODO: Implement inverse preprocessing
-    #
-    # vmin = params['vmin']
-    # vmax = params['vmax']
-    # 
-    # # Denormalize to dB
-    # image_db = normalized * (vmax - vmin) + vmin
-    # 
-    # # Convert to linear
-    # image_linear = 10 ** (image_db / 10)
-    # 
-    # return image_linear
+    vmin = params['vmin']
+    vmax = params['vmax']
     
-    raise NotImplementedError("TODO: Implement inverse preprocessing")
+    # Step 1: Denormalize to dB
+    image_db = normalized * (vmax - vmin) + vmin
+    
+    # Step 2: Convert to linear
+    image_linear = 10 ** (image_db / 10)
+    
+    return image_linear
 
 
-def extract_patches(
-    image: np.ndarray,
-    patch_size: int = 256,
-    stride: int = 128,
-    min_valid_fraction: float = 0.9
-) -> Tuple[np.ndarray, list]:
+def extract_patches(image, patch_size=256, stride=128, min_valid=0.9):
     """
-    Extract overlapping patches from image.
+    Extract patches from normalized image.
     
     Args:
-        image: Input image (already preprocessed to [0,1])
+        image: Normalized image [0, 1]
         patch_size: Size of square patches
-        stride: Step between patches (< patch_size for overlap)
-        min_valid_fraction: Minimum fraction of valid pixels
-    
+        stride: Step between patches (stride < patch_size = overlap)
+        min_valid: Minimum fraction of non-saturated pixels
+        
     Returns:
         patches: Array of shape (N, patch_size, patch_size)
-        positions: List of (row, col) positions for each patch
-    
-    Notes:
-        - Patches with too many boundary values are excluded
-        - stride = patch_size: no overlap (max unique patches)
-        - stride = patch_size // 2: 50% overlap (4× more patches)
+        positions: List of (y, x) positions
     """
-    # TODO: Implement patch extraction
-    #
-    # patches = []
-    # positions = []
-    # h, w = image.shape
-    # 
-    # for i in range(0, h - patch_size + 1, stride):
-    #     for j in range(0, w - patch_size + 1, stride):
-    #         patch = image[i:i+patch_size, j:j+patch_size]
-    #         
-    #         # Check validity
-    #         valid_frac = np.mean((patch > 0.01) & (patch < 0.99))
-    #         if valid_frac >= min_valid_fraction:
-    #             patches.append(patch)
-    #             positions.append((i, j))
-    # 
-    # return np.array(patches), positions
+    patches = []
+    positions = []
     
-    raise NotImplementedError("TODO: Implement patch extraction")
+    h, w = image.shape
+    
+    for i in range(0, h - patch_size + 1, stride):
+        for j in range(0, w - patch_size + 1, stride):
+            patch = image[i:i+patch_size, j:j+patch_size]
+            
+            # Check for valid pixels (not at clip boundaries)
+            valid_frac = np.mean((patch > 0.01) & (patch < 0.99))
+            
+            if valid_frac >= min_valid:
+                patches.append(patch)
+                positions.append((i, j))
+    
+    return np.array(patches), positions
 
 
-def compute_statistics(image: np.ndarray) -> Dict:
+def analyze_sar_statistics(image):
     """
     Compute comprehensive statistics for SAR image.
     
-    Useful for data exploration and preprocessing decisions.
-    
-    Args:
-        image: SAR image (linear intensity)
-    
-    Returns:
-        Dict containing:
-        - Linear domain: min, max, mean, std, median
-        - dB domain: min, max, mean, std, median
-        - Percentiles: p1, p5, p50, p95, p99
-        - Estimated looks (from CV)
-        - Dynamic range in dB
+    Returns a dictionary containing:
+    - Linear domain statistics
+    - dB domain statistics  
+    - Percentiles for clipping decisions
+    - Estimated number of looks from CV
     """
-    # TODO: Implement statistics computation
-    raise NotImplementedError("TODO: Implement statistics computation")
+    # Handle invalid values
+    image_valid = np.where(image > 0, image, np.nan)
+    image_clean = image_valid[~np.isnan(image_valid)]
+    
+    # =========================================
+    # LINEAR DOMAIN STATISTICS
+    # =========================================
+    linear_stats = {
+        'min': float(np.min(image_clean)),
+        'max': float(np.max(image_clean)),
+        'mean': float(np.mean(image_clean)),
+        'std': float(np.std(image_clean)),
+        'median': float(np.median(image_clean)),
+    }
+    
+    # Dynamic range in dB
+    linear_stats['dynamic_range_dB'] = 10 * np.log10(
+        linear_stats['max'] / linear_stats['min']
+    )
+    
+    # =========================================
+    # CONVERT TO dB
+    # =========================================
+    image_db = 10 * np.log10(image_clean)
+    
+    db_stats = {
+        'min': float(np.min(image_db)),
+        'max': float(np.max(image_db)),
+        'mean': float(np.mean(image_db)),
+        'std': float(np.std(image_db)),
+        'median': float(np.median(image_db)),
+    }
+    
+    # =========================================
+    # PERCENTILES (for clipping decisions)
+    # =========================================
+    percentiles = {
+        'p0.5': float(np.percentile(image_db, 0.5)),
+        'p1': float(np.percentile(image_db, 1)),
+        'p5': float(np.percentile(image_db, 5)),
+        'p50': float(np.percentile(image_db, 50)),
+        'p95': float(np.percentile(image_db, 95)),
+        'p99': float(np.percentile(image_db, 99)),
+        'p99.5': float(np.percentile(image_db, 99.5)),
+    }
+    
+    # =========================================
+    # ESTIMATE NUMBER OF LOOKS
+    # For gamma-distributed intensity: CV = 1/sqrt(L)
+    # So L = 1/CV²
+    # =========================================
+    cv = linear_stats['std'] / linear_stats['mean']
+    estimated_looks = 1 / (cv ** 2)
+    
+    # =========================================
+    # COUNT INVALID PIXELS
+    # =========================================
+    n_total = image.size
+    n_invalid = np.sum(image <= 0)
+    
+    return {
+        'linear': linear_stats,
+        'dB': db_stats,
+        'percentiles': percentiles,
+        'estimated_looks': estimated_looks,
+        'coefficient_of_variation': cv,
+        'invalid_pixel_fraction': n_invalid / n_total,
+    }
 
 
 def test_preprocessing():
@@ -288,7 +310,7 @@ def test_preprocessing():
     test_image = np.random.exponential(0.1, (512, 512)).astype(np.float32)
     
     # Test preprocessing
-    normalized, params = preprocess_sar_image(test_image)
+    normalized, params = preprocess_sar_complete(test_image)
     
     assert normalized.min() >= 0, "Normalized min should be >= 0"
     assert normalized.max() <= 1, "Normalized max should be <= 1"

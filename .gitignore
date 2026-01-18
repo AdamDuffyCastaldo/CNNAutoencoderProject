@@ -10,7 +10,9 @@ env/
 
 # Data and models (too large for git)
 data/raw/
+data/patches/
 data/processed/
+checkpoints/
 checkpoints/*.pt
 checkpoints/*.pth
 checkpoints/*.ckpt
