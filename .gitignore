@@ -39,3 +39,13 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+new_config_cell.py
+new_data_cell.py
+new_model_cell.py
+new_train_cell.py
+nul
+train_cell_39.txt
+train_cell_40.txt
+train_cell_41.txt
+train_cell_43.txt
+train_cell_44.txt
