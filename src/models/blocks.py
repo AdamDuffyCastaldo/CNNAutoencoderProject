@@ -51,21 +51,24 @@ class ConvBlock(nn.Module):
         negative_slope: float = 0.2
     ):
         super().__init__()
-        
-        # TODO: Implement ConvBlock
-        #
-        # self.conv = nn.Conv2d(...)
-        # self.bn = nn.BatchNorm2d(...) if use_bn else nn.Identity()
-        # self.activation = nn.LeakyReLU(negative_slope)
-        #
-        # Note: If use_bn=True, set bias=False in Conv2d (BN has its own bias)
-        
-        raise NotImplementedError("TODO: Implement ConvBlock")
-    
+
+        # Conv2d with bias=False when using BatchNorm (BN has its own bias)
+        self.conv = nn.Conv2d(
+            in_channels, out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            bias=not use_bn
+        )
+        self.bn = nn.BatchNorm2d(out_channels) if use_bn else nn.Identity()
+        self.activation = nn.LeakyReLU(negative_slope=negative_slope)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass: conv → bn → activation"""
-        # TODO: Implement forward pass
-        raise NotImplementedError("TODO: Implement forward pass")
+        """Forward pass: conv -> bn -> activation"""
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.activation(x)
+        return x
 
 
 class DeconvBlock(nn.Module):
@@ -99,19 +102,25 @@ class DeconvBlock(nn.Module):
         use_bn: bool = True
     ):
         super().__init__()
-        
-        # TODO: Implement DeconvBlock
-        #
-        # self.deconv = nn.ConvTranspose2d(...)
-        # self.bn = nn.BatchNorm2d(...) if use_bn else nn.Identity()
-        # self.activation = nn.ReLU()
-        
-        raise NotImplementedError("TODO: Implement DeconvBlock")
-    
+
+        # ConvTranspose2d with output_padding=1 for exact 2x upsampling
+        self.deconv = nn.ConvTranspose2d(
+            in_channels, out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            output_padding=output_padding,
+            bias=not use_bn
+        )
+        self.bn = nn.BatchNorm2d(out_channels) if use_bn else nn.Identity()
+        self.activation = nn.ReLU()
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass: deconv → bn → activation"""
-        # TODO: Implement forward pass
-        raise NotImplementedError("TODO: Implement forward pass")
+        """Forward pass: deconv -> bn -> activation"""
+        x = self.deconv(x)
+        x = self.bn(x)
+        x = self.activation(x)
+        return x
 
 
 class ResidualBlock(nn.Module):
