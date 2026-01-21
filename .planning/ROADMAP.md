@@ -16,6 +16,11 @@ This roadmap guides the implementation of a CNN-based autoencoder for compressin
 
 **Estimated Complexity:** Medium
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 01-01-PLAN.md - Complete PyTorch data loading infrastructure (SARPatchDataset, LazyPatchDataset, SARDataModule)
+
 ### Success Criteria
 
 1. Raw GeoTIFF files load successfully with rasterio and invalid values (zeros, NaN, negative) are handled without errors
@@ -316,7 +321,7 @@ This roadmap guides the implementation of a CNN-based autoencoder for compressin
 
 | Phase | Status | Success Criteria Met |
 |-------|--------|---------------------|
-| 1 - Data Pipeline | Not Started | 0/5 |
+| 1 - Data Pipeline | Planned | 0/5 |
 | 2 - Baseline Model | Not Started | 0/5 |
 | 3 - SAR Evaluation | Not Started | 0/5 |
 | 4 - Architecture Enhancement | Not Started | 0/5 |
