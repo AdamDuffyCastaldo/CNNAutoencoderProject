@@ -36,8 +36,8 @@ Build a complete SAR image compression system exploring the tradeoff between com
 | FR2.1 | Implement ConvBlock: Conv2d + BatchNorm + LeakyReLU(0.2) | Must | Existing stub |
 | FR2.2 | Implement DeconvBlock: ConvTranspose2d + BatchNorm + ReLU | Must | Existing stub |
 | FR2.3 | Implement ResidualBlock with projection shortcut for channel mismatch | Must | Knowledge: 02_RESIDUAL_BLOCKS |
-| FR2.4 | Implement 4-layer encoder: 256x256x1 → 16x16xC latent | Must | Research: Architecture |
-| FR2.5 | Implement 4-layer decoder: 16x16xC → 256x256x1 reconstructed | Must | Research: Architecture |
+| FR2.4 | Implement 4-layer encoder: 256x256x1 -> 16x16xC latent | Must | Research: Architecture |
+| FR2.5 | Implement 4-layer decoder: 16x16xC -> 256x256x1 reconstructed | Must | Research: Architecture |
 | FR2.6 | Use 5x5 kernels for improved receptive field | Should | Research: Architecture |
 | FR2.7 | Configurable latent channels (4, 8, 16, 32, 64) for compression ratio control | Must | PROJECT.md |
 | FR2.8 | Sigmoid output activation for bounded [0,1] output | Must | Research: Pitfall #8 |
@@ -134,8 +134,8 @@ Build a complete SAR image compression system exploring the tradeoff between com
 ### Variant A: Plain (Baseline)
 
 ```
-Encoder: Conv(1,64) → Conv(64,128) → Conv(128,256) → Conv(256,C_latent)
-Decoder: Deconv(C_latent,256) → Deconv(256,128) → Deconv(128,64) → Deconv(64,1)
+Encoder: Conv(1,64) -> Conv(64,128) -> Conv(128,256) -> Conv(256,C_latent)
+Decoder: Deconv(C_latent,256) -> Deconv(256,128) -> Deconv(128,64) -> Deconv(64,1)
 ```
 
 - Parameters: ~3-5M
@@ -144,8 +144,8 @@ Decoder: Deconv(C_latent,256) → Deconv(256,128) → Deconv(128,64) → Deconv(
 ### Variant B: Residual
 
 ```
-Encoder: Conv(1,64) → Res(64) → Conv(64,128) → Res(128) → Conv(128,256) → Res(256) → Conv(256,C_latent)
-Decoder: Deconv(C_latent,256) → Res(256) → Deconv(256,128) → Res(128) → Deconv(128,64) → Res(64) → Deconv(64,1)
+Encoder: Conv(1,64) -> Res(64) -> Conv(64,128) -> Res(128) -> Conv(128,256) -> Res(256) -> Conv(256,C_latent)
+Decoder: Deconv(C_latent,256) -> Res(256) -> Deconv(256,128) -> Res(128) -> Deconv(128,64) -> Res(64) -> Deconv(64,1)
 ```
 
 - Parameters: ~5-8M
@@ -210,4 +210,64 @@ Same as Variant B but with CBAM attention applied at bottleneck (16x16xC)
 
 ---
 
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FR1.1 | Phase 1: Data Pipeline | Pending |
+| FR1.2 | Phase 1: Data Pipeline | Pending |
+| FR1.3 | Phase 1: Data Pipeline | Pending |
+| FR1.4 | Phase 1: Data Pipeline | Pending |
+| FR1.5 | Phase 1: Data Pipeline | Pending |
+| FR1.6 | Phase 1: Data Pipeline | Pending |
+| FR1.7 | Phase 1: Data Pipeline | Pending |
+| FR1.8 | Phase 1: Data Pipeline | Pending |
+| FR1.9 | Phase 1: Data Pipeline | Pending |
+| FR1.10 | Phase 1: Data Pipeline | Pending |
+| FR2.1 | Phase 2: Baseline Model | Pending |
+| FR2.2 | Phase 2: Baseline Model | Pending |
+| FR2.3 | Phase 4: Architecture Enhancement | Pending |
+| FR2.4 | Phase 2: Baseline Model | Pending |
+| FR2.5 | Phase 2: Baseline Model | Pending |
+| FR2.6 | Phase 2: Baseline Model | Pending |
+| FR2.7 | Phase 2: Baseline Model | Pending |
+| FR2.8 | Phase 2: Baseline Model | Pending |
+| FR2.9 | Phase 2: Baseline Model | Pending |
+| FR2.10 | Phase 4: Architecture Enhancement | Pending |
+| FR3.1 | Phase 2: Baseline Model | Pending |
+| FR3.2 | Phase 2: Baseline Model | Pending |
+| FR3.3 | Phase 2: Baseline Model | Pending |
+| FR3.4 | Phase 2: Baseline Model | Pending |
+| FR3.5 | Phase 2: Baseline Model | Pending |
+| FR3.6 | Phase 2: Baseline Model | Pending |
+| FR3.7 | Phase 2: Baseline Model | Pending |
+| FR3.8 | Phase 2: Baseline Model | Pending |
+| FR3.9 | Phase 2: Baseline Model | Pending |
+| FR3.10 | Phase 2: Baseline Model | Pending |
+| FR4.1 | Phase 2: Baseline Model | Pending |
+| FR4.2 | Phase 2: Baseline Model | Pending |
+| FR4.3 | Phase 3: SAR Evaluation | Pending |
+| FR4.4 | Phase 3: SAR Evaluation | Pending |
+| FR4.5 | Phase 3: SAR Evaluation | Pending |
+| FR4.6 | Phase 3: SAR Evaluation | Pending |
+| FR4.7 | Phase 3: SAR Evaluation | Pending |
+| FR4.8 | Phase 3: SAR Evaluation | Pending |
+| FR4.9 | Phase 3: SAR Evaluation | Pending |
+| FR4.10 | Phase 3: SAR Evaluation | Pending |
+| FR5.1 | Phase 5: Full Image Inference | Pending |
+| FR5.2 | Phase 5: Full Image Inference | Pending |
+| FR5.3 | Phase 5: Full Image Inference | Pending |
+| FR5.4 | Phase 5: Full Image Inference | Pending |
+| FR5.5 | Phase 5: Full Image Inference | Pending |
+| FR5.6 | Phase 5: Full Image Inference | Pending |
+| FR6.1 | Phase 6: Final Experiments | Pending |
+| FR6.2 | Phase 4: Architecture Enhancement | Pending |
+| FR6.3 | Phase 4: Architecture Enhancement | Pending |
+| FR6.4 | Phase 6: Final Experiments | Pending |
+| FR6.5 | Phase 6: Final Experiments | Pending |
+| FR6.6 | Phase 6: Final Experiments | Pending |
+
+---
+
 *Requirements derived from: PROJECT.md, research synthesis, knowledge documents, and existing codebase analysis.*
+*Traceability added: 2026-01-21*
