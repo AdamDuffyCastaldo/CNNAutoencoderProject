@@ -71,6 +71,14 @@ Plans:
 
 **Estimated Complexity:** Medium
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md - Implement ConvBlock, DeconvBlock, SSIMLoss, CombinedLoss (foundational components)
+- [ ] 02-02-PLAN.md - Implement SAREncoder, SARDecoder, SARAutoencoder (model architecture)
+- [ ] 02-03-PLAN.md - Implement Trainer with TensorBoard, checkpointing, early stopping (training infrastructure)
+- [ ] 02-04-PLAN.md - Create training script and train baseline model (integration and training)
+
 ### Success Criteria
 
 1. Model forward pass completes without error: input (N,1,256,256) produces output (N,1,256,256) and latent (N,C,16,16)
@@ -322,7 +330,7 @@ Plans:
 | Phase | Status | Success Criteria Met |
 |-------|--------|---------------------|
 | 1 - Data Pipeline | Complete | 5/5 |
-| 2 - Baseline Model | Not Started | 0/5 |
+| 2 - Baseline Model | Planned | 0/5 |
 | 3 - SAR Evaluation | Not Started | 0/5 |
 | 4 - Architecture Enhancement | Not Started | 0/5 |
 | 5 - Full Image Inference | Not Started | 0/5 |
@@ -375,4 +383,5 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 ---
 
 *Roadmap created: 2026-01-21*
+*Phase 2 planned: 2026-01-21*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
