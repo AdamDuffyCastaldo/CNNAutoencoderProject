@@ -22,48 +22,44 @@ from .ssim import SSIMLoss
 class CombinedLoss(nn.Module):
     """
     Combined MSE + SSIM loss.
-    
-    Loss = mse_weight × MSE + ssim_weight × (1 - SSIM)
-    
+
+    Loss = mse_weight * MSE + ssim_weight * (1 - SSIM)
+
     Balances:
     - MSE: Pixel-wise accuracy (tends to blur)
     - SSIM: Structural preservation (encourages sharpness)
-    
+
     Args:
-        mse_weight: Weight for MSE term
-        ssim_weight: Weight for SSIM term
-        window_size: SSIM window size
-    
+        mse_weight: Weight for MSE term (default 0.5)
+        ssim_weight: Weight for SSIM term (default 0.5)
+        window_size: SSIM window size (default 11)
+
     Returns:
-        loss: Combined loss value (scalar tensor)
+        loss: Combined loss value (scalar tensor, differentiable)
         metrics: Dict with individual components
-    
+
     Example:
-        >>> loss_fn = CombinedLoss(mse_weight=1.0, ssim_weight=0.1)
+        >>> loss_fn = CombinedLoss(mse_weight=0.5, ssim_weight=0.5)
         >>> x = torch.randn(4, 1, 256, 256)
         >>> x_hat = torch.randn(4, 1, 256, 256)
         >>> loss, metrics = loss_fn(x_hat, x)
         >>> print(f"Loss: {metrics['loss']:.4f}, PSNR: {metrics['psnr']:.2f}")
     """
-    
+
     def __init__(
         self,
-        mse_weight: float = 1.0,
-        ssim_weight: float = 0.1,
+        mse_weight: float = 0.5,
+        ssim_weight: float = 0.5,
         window_size: int = 11
     ):
         super().__init__()
-        
+
         self.mse_weight = mse_weight
         self.ssim_weight = ssim_weight
-        
-        # TODO: Initialize loss components
-        #
-        # self.mse_loss = MSELoss()
-        # self.ssim_loss = SSIMLoss(window_size=window_size)
-        
-        raise NotImplementedError("TODO: Implement CombinedLoss initialization")
-    
+
+        self.mse_loss = MSELoss()
+        self.ssim_loss = SSIMLoss(window_size=window_size)
+
     def forward(
         self,
         x_hat: torch.Tensor,
@@ -71,37 +67,33 @@ class CombinedLoss(nn.Module):
     ) -> Tuple[torch.Tensor, Dict]:
         """
         Compute combined loss.
-        
+
         Args:
             x_hat: Reconstructed image (B, C, H, W)
             x: Original image (B, C, H, W)
-        
+
         Returns:
-            loss: Combined loss value
+            loss: Combined loss value (tensor, differentiable for backprop)
             metrics: Dict with 'loss', 'mse', 'ssim', 'psnr'
         """
-        # TODO: Implement combined loss
-        #
-        # mse = self.mse_loss(x_hat, x)
-        # ssim_loss = self.ssim_loss(x_hat, x)  # Returns 1 - SSIM
-        # 
-        # loss = self.mse_weight * mse + self.ssim_weight * ssim_loss
-        # 
-        # # Compute metrics
-        # with torch.no_grad():
-        #     psnr = 10 * torch.log10(1.0 / (mse + 1e-10))
-        #     ssim = 1 - ssim_loss
-        # 
-        # metrics = {
-        #     'loss': loss.item(),
-        #     'mse': mse.item(),
-        #     'ssim': ssim.item(),
-        #     'psnr': psnr.item(),
-        # }
-        # 
-        # return loss, metrics
-        
-        raise NotImplementedError("TODO: Implement combined loss forward")
+        mse = self.mse_loss(x_hat, x)
+        ssim_l = self.ssim_loss(x_hat, x)  # Returns 1 - SSIM
+
+        loss = self.mse_weight * mse + self.ssim_weight * ssim_l
+
+        # Compute metrics (detached for logging)
+        with torch.no_grad():
+            psnr = 10 * torch.log10(1.0 / (mse + 1e-10))
+            ssim = 1 - ssim_l
+
+        metrics = {
+            'loss': loss.item(),
+            'mse': mse.item(),
+            'ssim': ssim.item(),
+            'psnr': psnr.item(),
+        }
+
+        return loss, metrics
 
 
 class EdgePreservingLoss(nn.Module):
@@ -158,23 +150,23 @@ class EdgePreservingLoss(nn.Module):
 def test_losses():
     """Test loss functions."""
     print("Testing loss functions...")
-    
+
     # Create test data
     x = torch.rand(4, 1, 64, 64)
     x_perfect = x.clone()
     x_noisy = x + 0.1 * torch.randn_like(x)
     x_noisy = x_noisy.clamp(0, 1)
-    
-    # Test CombinedLoss
-    loss_fn = CombinedLoss(mse_weight=1.0, ssim_weight=0.1)
-    
+
+    # Test CombinedLoss with default 0.5/0.5 weights
+    loss_fn = CombinedLoss()
+
     loss_perfect, metrics_perfect = loss_fn(x_perfect, x)
     loss_noisy, metrics_noisy = loss_fn(x_noisy, x)
-    
+
     assert loss_perfect < loss_noisy, "Perfect should have lower loss"
-    print(f"✓ Perfect: loss={metrics_perfect['loss']:.4f}, psnr={metrics_perfect['psnr']:.1f}")
-    print(f"✓ Noisy: loss={metrics_noisy['loss']:.4f}, psnr={metrics_noisy['psnr']:.1f}")
-    
+    print(f"Perfect: loss={metrics_perfect['loss']:.6f}, psnr={metrics_perfect['psnr']:.1f}")
+    print(f"Noisy: loss={metrics_noisy['loss']:.4f}, psnr={metrics_noisy['psnr']:.1f}")
+
     print("All loss tests passed!")
 
 
