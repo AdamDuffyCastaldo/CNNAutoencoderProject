@@ -214,16 +214,16 @@ Same as Variant B but with CBAM attention applied at bottleneck (16x16xC)
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FR1.1 | Phase 1: Data Pipeline | Pending |
-| FR1.2 | Phase 1: Data Pipeline | Pending |
-| FR1.3 | Phase 1: Data Pipeline | Pending |
-| FR1.4 | Phase 1: Data Pipeline | Pending |
-| FR1.5 | Phase 1: Data Pipeline | Pending |
-| FR1.6 | Phase 1: Data Pipeline | Pending |
-| FR1.7 | Phase 1: Data Pipeline | Pending |
-| FR1.8 | Phase 1: Data Pipeline | Pending |
-| FR1.9 | Phase 1: Data Pipeline | Pending |
-| FR1.10 | Phase 1: Data Pipeline | Pending |
+| FR1.1 | Phase 1: Data Pipeline | Complete |
+| FR1.2 | Phase 1: Data Pipeline | Complete |
+| FR1.3 | Phase 1: Data Pipeline | Complete |
+| FR1.4 | Phase 1: Data Pipeline | Complete |
+| FR1.5 | Phase 1: Data Pipeline | Complete |
+| FR1.6 | Phase 1: Data Pipeline | Complete |
+| FR1.7 | Phase 1: Data Pipeline | Complete |
+| FR1.8 | Phase 1: Data Pipeline | Complete |
+| FR1.9 | Phase 1: Data Pipeline | Complete |
+| FR1.10 | Phase 1: Data Pipeline | Complete |
 | FR2.1 | Phase 2: Baseline Model | Pending |
 | FR2.2 | Phase 2: Baseline Model | Pending |
 | FR2.3 | Phase 4: Architecture Enhancement | Pending |
