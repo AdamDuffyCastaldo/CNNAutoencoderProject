@@ -27,28 +27,24 @@ def handle_invalid_values(
 ) -> np.ndarray:
     """
     Handle invalid values in SAR image.
-    
+
     SAR images can have:
     - Zeros (nodata, failed calibration)
     - Negative values (shouldn't exist but sometimes do)
     - NaN/Inf (processing errors)
-    
+
     Args:
         image: Input SAR intensity image
         noise_floor: Value to replace invalid pixels with
-    
+
     Returns:
         Cleaned image with no invalid values
     """
-    # TODO: Implement invalid value handling
-    #
-    # image = np.copy(image)
-    # image = np.where(image <= 0, noise_floor, image)
-    # image = np.where(np.isnan(image), noise_floor, image)
-    # image = np.where(np.isinf(image), noise_floor, image)
-    # return image
-    
-    raise NotImplementedError("TODO: Implement invalid value handling")
+    image = np.copy(image)
+    image = np.where(image <= 0, noise_floor, image)
+    image = np.where(np.isnan(image), noise_floor, image)
+    image = np.where(np.isinf(image), noise_floor, image)
+    return image
 
 
 
@@ -56,17 +52,16 @@ def handle_invalid_values(
 def from_db(db: np.ndarray) -> np.ndarray:
     """
     Convert dB back to linear intensity.
-    
+
     Formula: intensity = 10^(dB/10)
-    
+
     Args:
         db: Values in dB scale
-    
+
     Returns:
         Linear intensity values
     """
-    # TODO: Implement inverse dB conversion
-    raise NotImplementedError("TODO: Implement inverse dB conversion")
+    return 10 ** (db / 10)
 
 
 def compute_clip_bounds(
@@ -76,41 +71,39 @@ def compute_clip_bounds(
 ) -> Tuple[float, float]:
     """
     Compute clip bounds from training data.
-    
+
     Methods:
     - 'percentile': Use data-driven percentiles (low_pct, high_pct)
     - 'fixed': Use domain knowledge (vmin, vmax)
-    - 'sigma': Use mean ± k×std
-    
+    - 'sigma': Use mean +/- k*std
+
     Args:
         images: Array of images (in dB)
         method: Clipping method
         **kwargs: Method-specific parameters
-    
+
     Returns:
         (vmin, vmax) clip bounds in dB
-    
+
     Example:
-        >>> bounds = compute_clip_bounds(images, method='percentile', 
+        >>> bounds = compute_clip_bounds(images, method='percentile',
         ...                              low_pct=1, high_pct=99)
     """
-    # TODO: Implement clip bounds computation
-    #
-    # if method == 'percentile':
-    #     low_pct = kwargs.get('low_pct', 1)
-    #     high_pct = kwargs.get('high_pct', 99)
-    #     vmin = np.percentile(images, low_pct)
-    #     vmax = np.percentile(images, high_pct)
-    # elif method == 'fixed':
-    #     vmin = kwargs.get('vmin', -25)
-    #     vmax = kwargs.get('vmax', 5)
-    # elif method == 'sigma':
-    #     k = kwargs.get('k', 3)
-    #     vmin = np.mean(images) - k * np.std(images)
-    #     vmax = np.mean(images) + k * np.std(images)
-    # return vmin, vmax
-    
-    raise NotImplementedError("TODO: Implement clip bounds computation")
+    if method == 'percentile':
+        low_pct = kwargs.get('low_pct', 1)
+        high_pct = kwargs.get('high_pct', 99)
+        vmin = np.percentile(images, low_pct)
+        vmax = np.percentile(images, high_pct)
+    elif method == 'fixed':
+        vmin = kwargs.get('vmin', -25)
+        vmax = kwargs.get('vmax', 5)
+    elif method == 'sigma':
+        k = kwargs.get('k', 3)
+        vmin = np.mean(images) - k * np.std(images)
+        vmax = np.mean(images) + k * np.std(images)
+    else:
+        raise ValueError(f"Unknown method: {method}. Use 'percentile', 'fixed', or 'sigma'.")
+    return vmin, vmax
 
 
 def preprocess_sar_complete(image, vmin=None, vmax=None, clip_percentiles=(1, 99)):
@@ -137,7 +130,8 @@ def preprocess_sar_complete(image, vmin=None, vmax=None, clip_percentiles=(1, 99
     
     # Step 2: Convert to dB
     image_db = 10 * np.log10(image_clean)
-    image_db = np.maximum(image_db, noise_floor)
+    # Note: dB values can be negative (typical SAR range: -30 to +5 dB)
+    # The noise_floor was already applied to linear values to avoid log(0)
     
     
     # Step 3: Determine clip bounds
