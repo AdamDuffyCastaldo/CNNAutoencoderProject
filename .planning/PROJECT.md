@@ -30,6 +30,9 @@ Achieve maximum compression ratio while preserving SAR image quality sufficient 
 - [ ] Train multiple architecture variants for comparison
 - [ ] Train multiple compression ratio variants for comparison
 - [ ] Generate comparison study with metrics across variants
+- [ ] Compare against traditional codecs (JPEG-2000) at same compression ratios
+- [ ] End-to-end pipeline: raw Sentinel-1 GeoTIFF → compress → decompress → GeoTIFF
+- [ ] Production deployment: ONNX/TorchScript export, Docker container, REST API
 
 ### Out of Scope
 

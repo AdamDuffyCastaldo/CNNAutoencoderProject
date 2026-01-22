@@ -2,7 +2,7 @@
 
 ## Overview
 
-This roadmap guides the implementation of a CNN-based autoencoder for compressing Sentinel-1 SAR satellite imagery. The project follows a 6-phase structure derived from the requirements, progressing from data infrastructure through baseline model, evaluation framework, architecture enhancements, full-image inference, and concluding with a comprehensive comparison study. Each phase builds on the previous, with clear success criteria that can be verified before proceeding.
+This roadmap guides the implementation of a CNN-based autoencoder for compressing Sentinel-1 SAR satellite imagery. The project follows a 7-phase structure derived from the requirements, progressing from data infrastructure through baseline model, evaluation framework, architecture enhancements, full-image inference, comprehensive comparison study, and production deployment. Each phase builds on the previous, with clear success criteria that can be verified before proceeding.
 
 **Target outcome:** A trained compression system achieving >30 dB PSNR at 16x compression while preserving SAR-specific characteristics (speckle texture, edge detail), with complete rate-distortion analysis across multiple architecture variants.
 
@@ -138,7 +138,7 @@ Plans:
 
 ## Phase 3: SAR Evaluation Framework
 
-**Goal:** Implement SAR-specific quality metrics (ENL ratio, EPI) and evaluation tools that enable informed architecture decisions beyond standard PSNR/SSIM.
+**Goal:** Implement SAR-specific quality metrics (ENL ratio, EPI) and evaluation tools that enable informed architecture decisions beyond standard PSNR/SSIM. Establish traditional codec baselines (JPEG-2000, etc.) for meaningful comparison.
 
 **Dependencies:** Phase 2 (Baseline Model)
 
@@ -151,6 +151,7 @@ Plans:
 3. Evaluation script generates a complete metrics report (PSNR, SSIM, MS-SSIM, ENL ratio, EPI) for any trained model
 4. Visual comparison tool produces side-by-side images (original, reconstructed, difference) that reveal quality issues
 5. Rate-distortion curve generation works for multiple checkpoints at different compression ratios
+6. Traditional codec baselines (JPEG-2000 at minimum) evaluated at matching compression ratios (8x, 16x, 32x) with same metrics
 
 ### Requirements Mapped
 
@@ -164,14 +165,17 @@ Plans:
 | FR4.8 | Visual comparison generation |
 | FR4.9 | Rate-distortion curve generation |
 | FR4.10 | Batch evaluation across test set with statistics |
+| FR4.11 | Traditional codec baseline comparison (JPEG-2000, optionally JPEG, WebP) |
 
 ### Deliverables
 
 - `src/evaluation/metrics.py` - Complete ENL, EPI, histogram similarity implementations
 - `src/evaluation/evaluator.py` - Batch evaluation with statistics
 - `src/evaluation/visualizer.py` - Comparison image generation
+- `src/evaluation/codec_baselines.py` - Traditional codec compression/evaluation
 - Evaluation script for running complete assessment on checkpoints
 - Baseline model evaluation report with all metrics
+- Traditional codec benchmark results at 8x, 16x, 32x compression
 
 ### Key Tasks (High-Level)
 
@@ -182,6 +186,9 @@ Plans:
 - [ ] Implement compression ratio and BPP calculation
 - [ ] Build Evaluator class for batch evaluation with statistics
 - [ ] Build Visualizer class for comparison images
+- [ ] Implement JPEG-2000 baseline using OpenCV or Pillow (openjpeg backend)
+- [ ] Optionally implement JPEG, WebP baselines for additional comparison
+- [ ] Evaluate traditional codecs on test set with same metrics as autoencoder
 - [ ] Create evaluation script and run on baseline model
 
 ---
@@ -234,11 +241,11 @@ Plans:
 
 ## Phase 5: Full Image Inference
 
-**Goal:** Implement tiled inference with blending that processes complete Sentinel-1 scenes without visible seams or memory issues.
+**Goal:** Implement tiled inference with blending that processes complete Sentinel-1 scenes without visible seams or memory issues. Support raw GeoTIFF input for end-to-end compression pipeline.
 
 **Dependencies:** Phase 4 (Architecture Enhancement)
 
-**Estimated Complexity:** Medium
+**Estimated Complexity:** Medium-High
 
 ### Success Criteria
 
@@ -247,6 +254,8 @@ Plans:
 3. Processing time for full scene is under 5 minutes on RTX 3070
 4. Inverse preprocessing correctly restores linear SAR intensity values
 5. Round-trip full image compression maintains PSNR within 0.5 dB of patch-level metrics
+6. Raw Sentinel-1 GeoTIFF can be compressed and decompressed end-to-end via CLI or API
+7. Output GeoTIFF preserves geospatial metadata (CRS, transform, nodata) from input
 
 ### Requirements Mapped
 
@@ -258,10 +267,15 @@ Plans:
 | FR5.4 | Memory-efficient processing for large images |
 | FR5.5 | Inverse preprocessing (restore linear SAR values) |
 | FR5.6 | Preserve GeoTIFF metadata in output |
+| FR5.7 | Accept raw Sentinel-1 GeoTIFF as input (end-to-end pipeline) |
+| FR5.8 | Automatic preprocessing using saved model parameters |
+| FR5.9 | CLI interface for compress/decompress operations |
 
 ### Deliverables
 
 - `src/inference/compressor.py` - Complete tiled compression/decompression
+- `src/inference/pipeline.py` - End-to-end raw GeoTIFF → compressed → GeoTIFF pipeline
+- `compress.py` / `decompress.py` - CLI scripts for end-to-end usage
 - Full scene compression script
 - Blending weight visualization demonstrating smooth transitions
 - Performance benchmarks (time, memory) for full scene processing
@@ -273,6 +287,11 @@ Plans:
 - [ ] Implement cosine ramp blending weights
 - [ ] Implement memory-efficient batch processing
 - [ ] Implement inverse preprocessing for output
+- [ ] Implement raw GeoTIFF loading with rasterio (reuse Phase 1 preprocessing)
+- [ ] Implement automatic preprocessing using checkpoint's saved parameters
+- [ ] Implement GeoTIFF output with preserved metadata (CRS, transform, nodata)
+- [ ] Create CLI interface: `python compress.py input.tif -o compressed.bin --model best.pth`
+- [ ] Create CLI interface: `python decompress.py compressed.bin -o output.tif`
 - [ ] Test on full Sentinel-1 scene and verify seamlessness
 - [ ] Benchmark processing time and memory usage
 
@@ -289,10 +308,11 @@ Plans:
 ### Success Criteria
 
 1. All 9 experiment configurations (Plain/Residual/Res+CBAM at 8x/16x/32x) complete training successfully
-2. Rate-distortion curves are generated showing PSNR vs BPP for all architectures
+2. Rate-distortion curves are generated showing PSNR vs BPP for all architectures AND traditional codecs
 3. At least one configuration achieves PSNR >30 dB at 16x compression (primary target)
-4. Statistical analysis includes mean and standard deviation across test set for all metrics
-5. Final documentation includes visual examples at each compression level showing quality differences
+4. Best autoencoder variant outperforms JPEG-2000 at equivalent compression ratio
+5. Statistical analysis includes mean and standard deviation across test set for all metrics
+6. Final documentation includes visual examples at each compression level showing quality differences vs traditional codecs
 
 ### Requirements Mapped
 
@@ -308,10 +328,10 @@ Plans:
 ### Deliverables
 
 - 9 trained model checkpoints (3 architectures x 3 compression ratios)
-- Rate-distortion curves (PSNR vs BPP, SSIM vs BPP)
-- Comprehensive metrics table with statistics
-- Visual comparison gallery at each compression level
-- Final analysis document summarizing findings
+- Rate-distortion curves (PSNR vs BPP, SSIM vs BPP) including JPEG-2000 baseline
+- Comprehensive metrics table with statistics (autoencoders + traditional codecs)
+- Visual comparison gallery: autoencoder vs JPEG-2000 at each compression level
+- Final analysis document summarizing findings and codec comparison
 
 ### Key Tasks (High-Level)
 
@@ -319,9 +339,62 @@ Plans:
 - [ ] Train Residual architecture at 8x, 16x, 32x compression
 - [ ] Train Res+CBAM architecture at 8x, 16x, 32x compression
 - [ ] Evaluate all models on test set with full metrics suite
-- [ ] Generate rate-distortion curves
-- [ ] Create visual comparison gallery
-- [ ] Document findings and select best configuration
+- [ ] Include JPEG-2000 results in rate-distortion curves
+- [ ] Generate rate-distortion curves (autoencoders + traditional codecs)
+- [ ] Create visual comparison gallery (include JPEG-2000 comparison)
+- [ ] Document findings: autoencoder vs traditional codec performance
+
+---
+
+## Phase 7: Deployment
+
+**Goal:** Package the best-performing model for production deployment with multiple export formats, containerization, and optional API serving.
+
+**Dependencies:** Phase 6 (Final Experiments)
+
+**Estimated Complexity:** Medium
+
+### Success Criteria
+
+1. Model exports to ONNX format and runs inference correctly outside PyTorch
+2. TorchScript export works for deployment without Python dependencies
+3. Docker container runs inference on CPU and GPU with single command
+4. REST API endpoint accepts GeoTIFF upload and returns compressed/decompressed result
+5. Documentation covers all deployment options with examples
+6. Inference latency meets targets: <1s per patch, <5 min full scene
+
+### Requirements Mapped
+
+| ID | Requirement |
+|----|-------------|
+| FR7.1 | Export model to ONNX format |
+| FR7.2 | Export model to TorchScript |
+| FR7.3 | Docker container with GPU support |
+| FR7.4 | REST API for compression/decompression |
+| FR7.5 | Deployment documentation |
+| FR7.6 | Model versioning and checksum verification |
+
+### Deliverables
+
+- `scripts/export_onnx.py` - ONNX export with validation
+- `scripts/export_torchscript.py` - TorchScript export
+- `Dockerfile` and `docker-compose.yml` - Container setup (CPU + GPU variants)
+- `src/api/` - FastAPI application for REST serving
+- `docs/deployment.md` - Deployment guide with examples
+- Published Docker image (optional: Docker Hub / GitHub Container Registry)
+
+### Key Tasks (High-Level)
+
+- [ ] Implement ONNX export with dynamic batch size
+- [ ] Validate ONNX inference matches PyTorch output
+- [ ] Implement TorchScript export (trace or script)
+- [ ] Create Dockerfile with CUDA support
+- [ ] Create docker-compose for easy local deployment
+- [ ] Implement FastAPI endpoints: `/compress`, `/decompress`, `/health`
+- [ ] Add file upload/download handling for GeoTIFF
+- [ ] Write deployment documentation
+- [ ] Benchmark inference latency in container
+- [ ] Optional: CI/CD pipeline for automated builds
 
 ---
 
@@ -330,11 +403,12 @@ Plans:
 | Phase | Status | Success Criteria Met |
 |-------|--------|---------------------|
 | 1 - Data Pipeline | Complete | 5/5 |
-| 2 - Baseline Model | Planned | 0/5 |
-| 3 - SAR Evaluation | Not Started | 0/5 |
+| 2 - Baseline Model | In Progress | 3/5 |
+| 3 - SAR Evaluation | Not Started | 0/6 |
 | 4 - Architecture Enhancement | Not Started | 0/5 |
-| 5 - Full Image Inference | Not Started | 0/5 |
-| 6 - Final Experiments | Not Started | 0/5 |
+| 5 - Full Image Inference | Not Started | 0/7 |
+| 6 - Final Experiments | Not Started | 0/6 |
+| 7 - Deployment | Not Started | 0/6 |
 
 ---
 

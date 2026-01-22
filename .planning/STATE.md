@@ -12,18 +12,19 @@
 
 ## Current Position
 
-**Phase:** 2 of 6 (Baseline Model)
+**Phase:** 2 of 7 (Baseline Model)
 **Plan:** 2 of 4 complete
 **Status:** In progress
 
 **Progress:**
 ```
 Phase 1: Data Pipeline      [##########] 100%
-Phase 2: Baseline Model     [#####-----] 50%  <- Plan 02 complete
+Phase 2: Baseline Model     [#######---] 75%  <- Plan 04 in progress
 Phase 3: SAR Evaluation     [----------] 0%
 Phase 4: Architecture       [----------] 0%
 Phase 5: Full Inference     [----------] 0%
 Phase 6: Final Experiments  [----------] 0%
+Phase 7: Deployment         [----------] 0%
 ```
 
 ---
