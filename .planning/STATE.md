@@ -6,20 +6,20 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 1 - Data Pipeline (complete), ready for Phase 2 - Baseline Model
+**Current Focus:** Phase 2 - Baseline Model (plan 01 complete)
 
 ---
 
 ## Current Position
 
 **Phase:** 2 of 6 (Baseline Model)
-**Plan:** Not yet created
-**Status:** Ready to plan
+**Plan:** 1 of 4 complete
+**Status:** In progress
 
 **Progress:**
 ```
-Phase 1: Data Pipeline      [██████████] 100% ✓
-Phase 2: Baseline Model     [----------] 0%
+Phase 1: Data Pipeline      [██████████] 100%
+Phase 2: Baseline Model     [██░░░░░░░░] 25%  <- Plan 01 complete
 Phase 3: SAR Evaluation     [----------] 0%
 Phase 4: Architecture       [----------] 0%
 Phase 5: Full Inference     [----------] 0%
@@ -51,6 +51,8 @@ Phase 6: Final Experiments  [----------] 0%
 | batch_size=8 default | 8GB VRAM constraint (RTX 3070) | Implemented in SARDataModule |
 | num_workers=0 default | Windows compatibility | Implemented in SARDataModule |
 | Lazy loading as default | 182GB dataset too large for RAM | Implemented via LazyPatchDataset |
+| pytorch-msssim for SSIM | GPU-optimized, well-tested vs hand-rolled | Implemented in SSIMLoss |
+| 0.5/0.5 MSE/SSIM weights | Balanced weighting per CONTEXT.md | Default in CombinedLoss |
 
 ### Technical Notes
 
@@ -58,6 +60,8 @@ Phase 6: Final Experiments  [----------] 0%
 - **Dataset:** 696,277 patches across 44 .npy files (182GB), lazy loaded via mmap
 - **Preprocessing params:** vmin=14.7688, vmax=24.5407 (accessible via dm.preprocessing_params)
 - **Hardware constraint:** RTX 3070 with 8GB VRAM limits batch size to 8
+- **Model blocks:** ConvBlock halves spatial dims (256->128), DeconvBlock doubles (128->256)
+- **Loss function:** CombinedLoss returns (loss_tensor, metrics_dict) with loss, mse, ssim, psnr
 
 ### Blockers
 
@@ -74,15 +78,15 @@ None currently.
 ### Last Session
 
 - **Date:** 2026-01-21
-- **Activity:** Phase 1 Plan 01 executed
-- **Outcome:** Data pipeline complete (3 tasks, 3 commits)
-- **Duration:** 7 minutes
+- **Activity:** Phase 2 Plan 01 executed (Building Blocks and Loss Functions)
+- **Outcome:** ConvBlock, DeconvBlock, SSIMLoss, CombinedLoss implemented (3 tasks, 3 commits)
+- **Duration:** ~3 minutes
 
 ### Next Session
 
-- **Priority:** Execute Phase 2 (Baseline Model)
-- **Command:** `/gsd:plan-phase 2` then `/gsd:execute-phase 2`
-- **Context needed:** Review baseline autoencoder architecture requirements
+- **Priority:** Execute Phase 2 Plan 02 (Baseline Autoencoder Architecture)
+- **Command:** `/gsd:execute-plan 02-02`
+- **Context needed:** ConvBlock/DeconvBlock now available for encoder/decoder
 
 ---
 
@@ -94,6 +98,7 @@ None currently.
 - Research: `.planning/research/SUMMARY.md`
 - Roadmap: `.planning/ROADMAP.md`
 - Phase 1 Summary: `.planning/phases/01-data-pipeline/01-01-SUMMARY.md`
+- Phase 2 Plan 01 Summary: `.planning/phases/02-baseline-model/02-01-SUMMARY.md`
 
 **Codebase Entry Points:**
 - Preprocessing: `src/data/preprocessing.py`
@@ -105,4 +110,4 @@ None currently.
 
 ---
 
-*State updated: 2026-01-21*
+*State updated: 2026-01-21 (after 02-01 execution)*
