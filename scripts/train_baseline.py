@@ -28,7 +28,7 @@ def parse_args():
 
     # Data
     parser.add_argument('--data_path', type=str,
-                        default='D:/Projects/CNNAutoencoderProject/data/processed/metadata.npy',
+                        default='D:/Projects/CNNAutoencoderProject/data/patches/metadata.npy',
                         help='Path to metadata.npy or patches.npy')
     parser.add_argument('--batch_size', type=int, default=8,
                         help='Batch size (default: 8 for 8GB VRAM)')

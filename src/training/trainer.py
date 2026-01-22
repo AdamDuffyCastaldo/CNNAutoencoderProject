@@ -117,9 +117,24 @@ class Trainer:
         stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
         self.logger.addHandler(stream_handler)
 
-        # Save config to log directory
+        # Save config to log directory (convert numpy types for JSON serialization)
+        def convert_to_json_serializable(obj):
+            """Convert numpy types to Python native types for JSON."""
+            import numpy as np
+            if isinstance(obj, dict):
+                return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [convert_to_json_serializable(x) for x in obj]
+            elif isinstance(obj, (np.integer,)):
+                return int(obj)
+            elif isinstance(obj, (np.floating,)):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return obj
+
         with open(self.log_dir / 'config.json', 'w') as f:
-            json.dump(config, f, indent=2)
+            json.dump(convert_to_json_serializable(config), f, indent=2)
 
         # Checkpointing
         self.checkpoint_dir = Path(config.get('checkpoint_dir', 'checkpoints')) / self.run_name
