@@ -55,56 +55,66 @@ class SARDecoder(nn.Module):
         use_bn: bool = True
     ):
         super().__init__()
-        
+
         self.out_channels = out_channels
         self.latent_channels = latent_channels
         self.base_channels = base_channels
-        
-        # TODO: Implement decoder layers
-        #
-        # Architecture (mirrors encoder):
-        # Layer 1: latent_channels → base_channels*4, 16→32
-        # Layer 2: base_channels*4 → base_channels*2, 32→64
-        # Layer 3: base_channels*2 → base_channels, 64→128
-        # Layer 4: base_channels → out_channels, 128→256 (sigmoid output)
-        #
-        # Use DeconvBlock from blocks.py for layers 1-3
-        # Use plain ConvTranspose2d + Sigmoid for layer 4
-        #
-        # Important: Use output_padding=1 for exact 2× upsampling
-        
-        raise NotImplementedError("TODO: Implement decoder layers")
-        
-        # Initialize weights
+
+        # Layer 1: latent_channels -> base_channels*4, 16->32
+        self.layer1 = DeconvBlock(
+            latent_channels, base_channels * 4,
+            kernel_size=5, stride=2, padding=2, output_padding=1, use_bn=use_bn
+        )
+
+        # Layer 2: base_channels*4 -> base_channels*2, 32->64
+        self.layer2 = DeconvBlock(
+            base_channels * 4, base_channels * 2,
+            kernel_size=5, stride=2, padding=2, output_padding=1, use_bn=use_bn
+        )
+
+        # Layer 3: base_channels*2 -> base_channels, 64->128
+        self.layer3 = DeconvBlock(
+            base_channels * 2, base_channels,
+            kernel_size=5, stride=2, padding=2, output_padding=1, use_bn=use_bn
+        )
+
+        # Layer 4: base_channels -> out_channels, 128->256
+        # No batchnorm, sigmoid applied in forward
+        self.layer4 = nn.ConvTranspose2d(
+            base_channels, out_channels,
+            kernel_size=5, stride=2, padding=2, output_padding=1
+        )
+
+        # Initialize weights after all layers are defined
         self._initialize_weights()
     
     def _initialize_weights(self):
         """Initialize weights using He initialization."""
-        # TODO: Implement weight initialization
-        # Same pattern as encoder
-        
-        raise NotImplementedError("TODO: Implement weight initialization")
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
     
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         """
         Forward pass through decoder.
-        
+
         Args:
             z: Latent tensor of shape (batch, latent_channels, 16, 16)
-        
+
         Returns:
             Reconstructed tensor of shape (batch, 1, 256, 256)
         """
-        # TODO: Implement forward pass
-        #
-        # x = self.layer1(z)  # (B, 256, 32, 32)
-        # x = self.layer2(x)  # (B, 128, 64, 64)
-        # x = self.layer3(x)  # (B, 64, 128, 128)
-        # x = self.layer4(x)  # (B, 1, 256, 256)
-        # x = torch.sigmoid(x)  # Bound to [0, 1]
-        # return x
-        
-        raise NotImplementedError("TODO: Implement forward pass")
+        x = self.layer1(z)  # (B, 256, 32, 32)
+        x = self.layer2(x)  # (B, 128, 64, 64)
+        x = self.layer3(x)  # (B, 64, 128, 128)
+        x = self.layer4(x)  # (B, 1, 256, 256)
+        x = torch.sigmoid(x)  # FR2.8: Sigmoid output for [0,1] bounded output
+        return x
 
 
 def test_decoder():
