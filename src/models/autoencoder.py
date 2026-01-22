@@ -65,124 +65,111 @@ class SARAutoencoder(nn.Module):
         use_bn: bool = True
     ):
         super().__init__()
-        
+
         self.latent_channels = latent_channels
         self.base_channels = base_channels
-        
-        # TODO: Create encoder and decoder
-        #
-        # self.encoder = SAREncoder(
-        #     in_channels=1,
-        #     latent_channels=latent_channels,
-        #     base_channels=base_channels,
-        #     use_bn=use_bn
-        # )
-        # 
-        # self.decoder = SARDecoder(
-        #     out_channels=1,
-        #     latent_channels=latent_channels,
-        #     base_channels=base_channels,
-        #     use_bn=use_bn
-        # )
-        
-        raise NotImplementedError("TODO: Implement autoencoder")
+
+        self.encoder = SAREncoder(
+            in_channels=1,
+            latent_channels=latent_channels,
+            base_channels=base_channels,
+            use_bn=use_bn
+        )
+
+        self.decoder = SARDecoder(
+            out_channels=1,
+            latent_channels=latent_channels,
+            base_channels=base_channels,
+            use_bn=use_bn
+        )
     
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass: encode then decode.
-        
+
         Args:
             x: Input tensor (B, 1, 256, 256)
-            
+
         Returns:
             x_hat: Reconstructed tensor (B, 1, 256, 256)
             z: Latent representation (B, C, 16, 16)
         """
-        # TODO: Implement forward pass
-        #
-        # z = self.encoder(x)
-        # x_hat = self.decoder(z)
-        # return x_hat, z
-        
-        raise NotImplementedError("TODO: Implement forward pass")
+        z = self.encoder(x)
+        x_hat = self.decoder(z)
+        return x_hat, z
     
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """Encode input to latent representation."""
-        # TODO: Implement encode
-        raise NotImplementedError("TODO: Implement encode")
-    
+        return self.encoder(x)
+
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         """Decode latent representation to output."""
-        # TODO: Implement decode
-        raise NotImplementedError("TODO: Implement decode")
+        return self.decoder(z)
     
     def get_compression_ratio(self, input_size: int = 256) -> float:
         """
         Calculate compression ratio.
-        
+
         Compression ratio = input_elements / latent_elements
-        
+
         Args:
             input_size: Input spatial size (default 256)
-            
+
         Returns:
-            Compression ratio (e.g., 4.0 for 4× compression)
+            Compression ratio (e.g., 4.0 for 4x compression)
         """
-        # TODO: Implement compression ratio calculation
-        #
-        # input_elements = input_size * input_size * 1
-        # latent_size = input_size // 16  # 4 stride-2 layers
-        # latent_elements = latent_size * latent_size * self.latent_channels
-        # return input_elements / latent_elements
-        
-        raise NotImplementedError("TODO: Implement compression ratio")
+        input_elements = input_size * input_size * 1  # 65536 for 256x256x1
+        latent_size = input_size // 16  # 16 for 256 input
+        latent_elements = latent_size * latent_size * self.latent_channels
+        return input_elements / latent_elements
     
     def get_latent_size(self, input_size: int = 256) -> Tuple[int, int, int]:
         """
         Get latent tensor dimensions for given input size.
-        
+
         Args:
             input_size: Input spatial size
-            
+
         Returns:
             (channels, height, width) tuple
         """
-        # TODO: Implement latent size calculation
-        raise NotImplementedError("TODO: Implement latent size")
+        latent_size = input_size // 16
+        return (self.latent_channels, latent_size, latent_size)
     
     def count_parameters(self) -> Dict[str, int]:
         """
         Count parameters in encoder and decoder.
-        
+
         Returns:
             Dict with 'encoder', 'decoder', 'total' parameter counts
         """
-        # TODO: Implement parameter counting
-        #
-        # encoder_params = sum(p.numel() for p in self.encoder.parameters())
-        # decoder_params = sum(p.numel() for p in self.decoder.parameters())
-        # return {
-        #     'encoder': encoder_params,
-        #     'decoder': decoder_params,
-        #     'total': encoder_params + decoder_params
-        # }
-        
-        raise NotImplementedError("TODO: Implement parameter counting")
+        encoder_params = sum(p.numel() for p in self.encoder.parameters())
+        decoder_params = sum(p.numel() for p in self.decoder.parameters())
+        return {
+            'encoder': encoder_params,
+            'decoder': decoder_params,
+            'total': encoder_params + decoder_params
+        }
     
     def analyze_latent(self, z: torch.Tensor) -> Dict[str, float]:
         """
         Analyze latent representation statistics.
-        
+
         Useful for monitoring training and diagnosing issues.
-        
+
         Args:
             z: Latent tensor (B, C, H, W)
-            
+
         Returns:
             Dict with mean, std, min, max, sparsity, etc.
         """
-        # TODO: Implement latent analysis
-        raise NotImplementedError("TODO: Implement latent analysis")
+        return {
+            'mean': z.mean().item(),
+            'std': z.std().item(),
+            'min': z.min().item(),
+            'max': z.max().item(),
+            'sparsity': (z.abs() < 0.1).float().mean().item()
+        }
 
 
 def test_autoencoder():
