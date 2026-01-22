@@ -54,82 +54,90 @@ class SAREncoder(nn.Module):
         use_bn: bool = True
     ):
         super().__init__()
-        
+
         self.in_channels = in_channels
         self.latent_channels = latent_channels
         self.base_channels = base_channels
-        
-        # TODO: Implement encoder layers
-        # 
-        # Architecture:
-        # Layer 1: in_channels → base_channels, 256→128
-        # Layer 2: base_channels → base_channels*2, 128→64
-        # Layer 3: base_channels*2 → base_channels*4, 64→32
-        # Layer 4: base_channels*4 → latent_channels, 32→16 (no activation)
-        #
-        # Use ConvBlock from blocks.py for layers 1-3
-        # Use plain Conv2d for layer 4 (no BN or activation on output)
-        
-        raise NotImplementedError("TODO: Implement encoder layers")
-        
-        # Initialize weights
+
+        # Layer 1: in_channels -> base_channels, 256->128
+        self.layer1 = ConvBlock(
+            in_channels, base_channels,
+            kernel_size=5, stride=2, padding=2, use_bn=use_bn
+        )
+
+        # Layer 2: base_channels -> base_channels*2, 128->64
+        self.layer2 = ConvBlock(
+            base_channels, base_channels * 2,
+            kernel_size=5, stride=2, padding=2, use_bn=use_bn
+        )
+
+        # Layer 3: base_channels*2 -> base_channels*4, 64->32
+        self.layer3 = ConvBlock(
+            base_channels * 2, base_channels * 4,
+            kernel_size=5, stride=2, padding=2, use_bn=use_bn
+        )
+
+        # Layer 4: base_channels*4 -> latent_channels, 32->16
+        # No activation, no batchnorm (latent should be unbounded)
+        self.layer4 = nn.Conv2d(
+            base_channels * 4, latent_channels,
+            kernel_size=5, stride=2, padding=2
+        )
+
+        # Initialize weights after all layers are defined
         self._initialize_weights()
     
     def _initialize_weights(self):
         """
         Initialize weights using He initialization.
-        
+
         He init is optimal for ReLU-family activations.
         """
-        # TODO: Implement weight initialization
-        # 
-        # For each Conv2d layer:
-        #   nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
-        #   if m.bias is not None: nn.init.zeros_(m.bias)
-        # 
-        # For each BatchNorm2d layer:
-        #   nn.init.ones_(m.weight)
-        #   nn.init.zeros_(m.bias)
-        
-        raise NotImplementedError("TODO: Implement weight initialization")
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, a=0.2, mode='fan_out', nonlinearity='leaky_relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass through encoder.
-        
+
         Args:
             x: Input tensor of shape (batch, 1, 256, 256)
-        
+
         Returns:
             Latent tensor of shape (batch, latent_channels, 16, 16)
         """
-        # TODO: Implement forward pass
-        # 
-        # x = self.layer1(x)  # (B, 64, 128, 128)
-        # x = self.layer2(x)  # (B, 128, 64, 64)
-        # x = self.layer3(x)  # (B, 256, 32, 32)
-        # x = self.layer4(x)  # (B, latent_channels, 16, 16)
-        # return x
-        
-        raise NotImplementedError("TODO: Implement forward pass")
+        x = self.layer1(x)  # (B, 64, 128, 128)
+        x = self.layer2(x)  # (B, 128, 64, 64)
+        x = self.layer3(x)  # (B, 256, 32, 32)
+        x = self.layer4(x)  # (B, latent_channels, 16, 16)
+        return x
     
     def get_receptive_field(self) -> int:
         """
         Calculate theoretical receptive field of encoder.
-        
+
         For kernel=5, stride=2 at each layer:
-        RF_l = RF_{l-1} + (kernel-1) × stride_product
-        
+        RF_l = RF_{l-1} + (kernel-1) * stride_product
+
         Returns:
             Receptive field size in pixels
         """
-        # TODO: Calculate receptive field
         # Layer 1: RF = 5
         # Layer 2: RF = 5 + (5-1)*2 = 13
         # Layer 3: RF = 13 + (5-1)*4 = 29
         # Layer 4: RF = 29 + (5-1)*8 = 61
-        
-        raise NotImplementedError("TODO: Implement receptive field calculation")
+        rf = 5
+        stride_product = 2
+        for _ in range(3):
+            rf += (5 - 1) * stride_product
+            stride_product *= 2
+        return rf
 
 
 def test_encoder():
