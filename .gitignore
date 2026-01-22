@@ -24,7 +24,7 @@ checkpoints/*.ckpt
 *.log
 experiments/*/
 wandb/
-runs/
+
 
 # OS
 .DS_Store

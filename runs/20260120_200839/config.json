@@ -1,0 +1,27 @@
+{
+  "train_size": 40000,
+  "val_size": 10000,
+  "batch_size": 32,
+  "num_workers": 0,
+  "cache_size": 32,
+  "augment": true,
+  "latent_channels": 64,
+  "base_channels": 64,
+  "use_bn": true,
+  "mse_weight": 1.0,
+  "ssim_weight": 0.1,
+  "ssim_window_size": 11,
+  "learning_rate": 0.0001,
+  "weight_decay": 0,
+  "betas": [
+    0.9,
+    0.999
+  ],
+  "max_grad_norm": 1.0,
+  "lr_factor": 0.5,
+  "lr_patience": 5,
+  "epochs": 50,
+  "early_stopping_patience": 20,
+  "log_dir": "d:\\Projects\\CNNAutoencoderProject\\runs",
+  "checkpoint_dir": "d:\\Projects\\CNNAutoencoderProject\\checkpoints"
+}
