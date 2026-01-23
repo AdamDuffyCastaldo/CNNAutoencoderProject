@@ -172,6 +172,7 @@ class Trainer:
         self.model.train()
         epoch_metrics = defaultdict(float)
         num_batches = 0
+        nan_batches = 0
 
         pbar = tqdm(self.train_loader, desc=f"Epoch {self.epoch+1} [Train]",
                     leave=True, dynamic_ncols=True)
@@ -185,6 +186,11 @@ class Trainer:
             with autocast('cuda', enabled=self.use_amp):
                 x_hat, z = self.model(x)
                 loss, metrics = self.loss_fn(x_hat, x)
+
+            # Skip batch if loss is NaN (numerical instability protection)
+            if torch.isnan(loss) or torch.isinf(loss):
+                nan_batches += 1
+                continue
 
             # Backward with gradient scaling for AMP
             self.scaler.scale(loss).backward()
@@ -213,6 +219,9 @@ class Trainer:
                 'ssim': f"{metrics['ssim']:.4f}"
             })
 
+        if nan_batches > 0:
+            self.logger.warning(f"Skipped {nan_batches} batches with NaN loss")
+
         return {k: v / num_batches for k, v in epoch_metrics.items()}
 
     @torch.no_grad()
@@ -226,6 +235,7 @@ class Trainer:
         self.model.eval()
         epoch_metrics = defaultdict(float)
         num_batches = 0
+        nan_batches = 0
 
         pbar = tqdm(self.val_loader, desc=f"Epoch {self.epoch+1} [Val]",
                     leave=True, dynamic_ncols=True)
@@ -235,7 +245,16 @@ class Trainer:
 
             with autocast('cuda', enabled=self.use_amp):
                 x_hat, z = self.model(x)
-                loss, metrics = self.loss_fn(x_hat, x)
+
+            # Cast to float32 for stable loss computation (fixes AMP NaN issues)
+            x_hat = x_hat.float()
+            x = x.float()
+            loss, metrics = self.loss_fn(x_hat, x)
+
+            # Skip NaN batches (numerical instability protection)
+            if any(v != v for v in metrics.values()):  # NaN check
+                nan_batches += 1
+                continue
 
             for key, value in metrics.items():
                 epoch_metrics[key] += value
@@ -246,6 +265,13 @@ class Trainer:
                 'psnr': f"{metrics['psnr']:.2f}",
                 'ssim': f"{metrics['ssim']:.4f}"
             })
+
+        if nan_batches > 0:
+            self.logger.warning(f"Skipped {nan_batches} batches with NaN values")
+
+        if num_batches == 0:
+            self.logger.error("All validation batches produced NaN!")
+            return {'loss': float('inf'), 'psnr': 0, 'ssim': 0, 'mse': float('inf')}
 
         return {k: v / num_batches for k, v in epoch_metrics.items()}
 
