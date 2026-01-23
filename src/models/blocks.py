@@ -126,62 +126,61 @@ class DeconvBlock(nn.Module):
 class ResidualBlock(nn.Module):
     """
     Basic residual block with skip connection.
-    
+
     Structure: x → Conv → BN → ReLU → Conv → BN → (+x) → ReLU
-    
+
     The skip connection allows gradient to flow directly, enabling
     training of deeper networks.
-    
+
     Args:
         channels: Number of input/output channels (must match for skip)
         kernel_size: Convolution kernel size (default 3)
-    
+
     References:
         - Day 4, Section 4.1-4.2 of learning guide
         - He et al. "Deep Residual Learning" (2016)
     """
-    
+
     def __init__(self, channels: int, kernel_size: int = 3):
         super().__init__()
-        
-        # TODO: Implement ResidualBlock
-        #
-        # padding = kernel_size // 2
-        # self.conv1 = nn.Conv2d(channels, channels, kernel_size, padding=padding)
-        # self.bn1 = nn.BatchNorm2d(channels)
-        # self.conv2 = nn.Conv2d(channels, channels, kernel_size, padding=padding)
-        # self.bn2 = nn.BatchNorm2d(channels)
-        
-        raise NotImplementedError("TODO: Implement ResidualBlock")
-    
+
+        padding = kernel_size // 2
+        self.conv1 = nn.Conv2d(channels, channels, kernel_size, padding=padding, bias=False)
+        self.bn1 = nn.BatchNorm2d(channels)
+        self.conv2 = nn.Conv2d(channels, channels, kernel_size, padding=padding, bias=False)
+        self.bn2 = nn.BatchNorm2d(channels)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass with skip connection."""
-        # TODO: Implement forward pass
-        #
-        # residual = x
-        # out = F.relu(self.bn1(self.conv1(x)))
-        # out = self.bn2(self.conv2(out))
-        # out = out + residual  # Skip connection
-        # out = F.relu(out)
-        # return out
-        
-        raise NotImplementedError("TODO: Implement forward pass")
+        residual = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = F.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        out = out + residual  # Skip connection
+        out = F.relu(out)
+
+        return out
 
 
 class ResidualBlockWithDownsample(nn.Module):
     """
     Residual block with spatial downsampling.
-    
+
     When changing spatial dimensions, the skip connection needs a
     1×1 strided convolution to match dimensions.
-    
+
     Args:
         in_channels: Input channels
         out_channels: Output channels
         stride: Downsampling stride (default 2)
         kernel_size: Main conv kernel size (default 3)
     """
-    
+
     def __init__(
         self,
         in_channels: int,
@@ -190,33 +189,58 @@ class ResidualBlockWithDownsample(nn.Module):
         kernel_size: int = 3
     ):
         super().__init__()
-        
-        # TODO: Implement ResidualBlockWithDownsample
-        #
-        # Main path: two convolutions (first with stride)
-        # Skip path: 1×1 conv with same stride to match dimensions
-        
-        raise NotImplementedError("TODO: Implement ResidualBlockWithDownsample")
-    
+
+        padding = kernel_size // 2
+
+        # Main path: first conv with stride for downsampling
+        self.conv1 = nn.Conv2d(
+            in_channels, out_channels, kernel_size,
+            stride=stride, padding=padding, bias=False
+        )
+        self.bn1 = nn.BatchNorm2d(out_channels)
+
+        self.conv2 = nn.Conv2d(
+            out_channels, out_channels, kernel_size,
+            stride=1, padding=padding, bias=False
+        )
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
+        # Skip path: 1×1 conv with stride to match dimensions
+        self.skip = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 1, stride=stride, bias=False),
+            nn.BatchNorm2d(out_channels)
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass with downsampling."""
-        # TODO: Implement forward pass
-        raise NotImplementedError("TODO: Implement forward pass")
+        residual = self.skip(x)
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = F.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        out = out + residual  # Skip connection
+        out = F.relu(out)
+
+        return out
 
 
 class ResidualBlockWithUpsample(nn.Module):
     """
     Residual block with spatial upsampling.
-    
+
     Uses transposed convolution for learnable upsampling.
-    
+
     Args:
         in_channels: Input channels
         out_channels: Output channels
         scale_factor: Upsampling factor (default 2)
         kernel_size: Main conv kernel size (default 3)
     """
-    
+
     def __init__(
         self,
         in_channels: int,
@@ -225,18 +249,43 @@ class ResidualBlockWithUpsample(nn.Module):
         kernel_size: int = 3
     ):
         super().__init__()
-        
-        # TODO: Implement ResidualBlockWithUpsample
-        #
+
+        padding = kernel_size // 2
+
         # Main path: transposed conv for upsampling, then regular conv
+        self.conv1 = nn.ConvTranspose2d(
+            in_channels, out_channels, kernel_size,
+            stride=scale_factor, padding=padding, output_padding=1, bias=False
+        )
+        self.bn1 = nn.BatchNorm2d(out_channels)
+
+        self.conv2 = nn.Conv2d(
+            out_channels, out_channels, kernel_size,
+            stride=1, padding=padding, bias=False
+        )
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
         # Skip path: transposed 1×1 conv to match dimensions
-        
-        raise NotImplementedError("TODO: Implement ResidualBlockWithUpsample")
-    
+        self.skip = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, 1, stride=scale_factor, output_padding=1, bias=False),
+            nn.BatchNorm2d(out_channels)
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass with upsampling."""
-        # TODO: Implement forward pass
-        raise NotImplementedError("TODO: Implement forward pass")
+        residual = self.skip(x)
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = F.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        out = out + residual  # Skip connection
+        out = F.relu(out)
+
+        return out
 
 
 # ============================================================================

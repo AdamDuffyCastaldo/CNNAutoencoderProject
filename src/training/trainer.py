@@ -8,6 +8,7 @@ This module implements the main training loop with:
 - TensorBoard logging
 - Early stopping
 - Gradient clipping
+- Mixed Precision Training (AMP) for ~2x speedup
 
 References:
     - Day 2, Section 2.7 of the learning guide
@@ -17,6 +18,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
+from torch.amp import GradScaler, autocast
 import torchvision.utils as vutils
 from pathlib import Path
 from datetime import datetime
@@ -150,8 +152,15 @@ class Trainer:
         # Store fixed sample batch for consistent visualization
         self._sample_batch = None
 
+        # Mixed Precision Training (AMP) - ~2x speedup on modern GPUs
+        self.use_amp = config.get('use_amp', True) and torch.cuda.is_available()
+        self.scaler = GradScaler('cuda', enabled=self.use_amp)
+        if self.use_amp:
+            print("Mixed Precision (AMP) enabled - ~2x training speedup")
+
         self.logger.info(f"Log directory: {self.log_dir}")
         self.logger.info(f"Checkpoint directory: {self.checkpoint_dir}")
+        self.logger.info(f"Mixed Precision (AMP): {'enabled' if self.use_amp else 'disabled'}")
 
     def train_epoch(self) -> Dict[str, float]:
         """
@@ -170,22 +179,26 @@ class Trainer:
         for batch in pbar:
             x = batch.to(self.device, non_blocking=True)
 
-            # Forward
+            # Forward with mixed precision
             self.optimizer.zero_grad()
-            x_hat, z = self.model(x)
-            loss, metrics = self.loss_fn(x_hat, x)
 
-            # Backward
-            loss.backward()
+            with autocast('cuda', enabled=self.use_amp):
+                x_hat, z = self.model(x)
+                loss, metrics = self.loss_fn(x_hat, x)
+
+            # Backward with gradient scaling for AMP
+            self.scaler.scale(loss).backward()
 
             # Gradient clipping (FR3.5: max norm 1.0)
+            self.scaler.unscale_(self.optimizer)
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),
                 self.config.get('max_grad_norm', 1.0)
             )
 
-            # Update
-            self.optimizer.step()
+            # Update with scaler
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
 
             # Accumulate metrics
             for key, value in metrics.items():
@@ -219,8 +232,10 @@ class Trainer:
 
         for batch in pbar:
             x = batch.to(self.device, non_blocking=True)
-            x_hat, z = self.model(x)
-            loss, metrics = self.loss_fn(x_hat, x)
+
+            with autocast('cuda', enabled=self.use_amp):
+                x_hat, z = self.model(x)
+                loss, metrics = self.loss_fn(x_hat, x)
 
             for key, value in metrics.items():
                 epoch_metrics[key] += value
@@ -242,6 +257,7 @@ class Trainer:
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'scheduler_state_dict': self.scheduler.state_dict(),
+            'scaler_state_dict': self.scaler.state_dict(),  # AMP scaler state
             'best_val_loss': self.best_val_loss,
             'epochs_without_improvement': self.epochs_without_improvement,
             'config': self.config,
@@ -267,6 +283,10 @@ class Trainer:
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
+        # Load AMP scaler state if available
+        if 'scaler_state_dict' in checkpoint and self.use_amp:
+            self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+
         self.epoch = checkpoint['epoch'] + 1  # Resume from next epoch
         self.global_step = checkpoint['global_step']
         self.best_val_loss = checkpoint['best_val_loss']
@@ -285,7 +305,12 @@ class Trainer:
             self._sample_batch = next(iter(self.val_loader))[:num_images]
 
         x = self._sample_batch.to(self.device)
-        x_hat, z = self.model(x)
+
+        with autocast('cuda', enabled=self.use_amp):
+            x_hat, z = self.model(x)
+
+        # Convert to float32 for visualization
+        x_hat = x_hat.float()
 
         # Create triple view: original | reconstructed | difference (per CONTEXT.md)
         diff = torch.abs(x - x_hat)
