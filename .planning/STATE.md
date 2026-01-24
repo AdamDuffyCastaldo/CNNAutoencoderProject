@@ -6,22 +6,22 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 4 - Architecture Improvements (Plan 3 of 3 complete)
+**Current Focus:** Phase 4 - Architecture Improvements (Plan 5 complete - training notebook ready)
 
 ---
 
 ## Current Position
 
 **Phase:** 4 of 7 (Architecture Improvements)
-**Plan:** 3 of 3 complete
-**Status:** Phase complete, ready for training
+**Plan:** 5 of 6 complete (04-05 training notebook created)
+**Status:** Variant C training notebook ready; full training deferred (~60+ hours)
 
 **Progress:**
 ```
 Phase 1: Data Pipeline      [##########] 100%
 Phase 2: Baseline Model     [##########] 100%
 Phase 3: SAR Evaluation     [##########] 100%
-Phase 4: Architecture       [##########] 100%    <- COMPLETE
+Phase 4: Architecture       [########--] 83%    <- 5/6 plans, full training pending
 Phase 5: Full Inference     [----------] 0%
 Phase 6: Final Experiments  [----------] 0%
 Phase 7: Deployment         [----------] 0%
@@ -46,9 +46,10 @@ Phase 7: Deployment         [----------] 0%
 | ResNet-Lite v1 | 5.6M | 0.1415 | 21.24 dB | 0.725 |
 | **ResNet-Lite v2** | 5.6M | **0.1410** | **21.20 dB** | **0.726** |
 | ResidualAutoencoder (Variant B) | 23.8M | -- | -- | -- |
-| AttentionAutoencoder (Variant C) | 24.0M | -- | -- | -- |
+| AttentionAutoencoder (Variant C) | 24.0M | pending | pending | pending |
 
 **Best Checkpoint:** `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
+**Variant C Quick Test:** `notebooks/checkpoints/attention_v1_c16/quick_test.pth` (50 batches only)
 
 ### Codec Baselines (Random Noise Test @ 16x)
 
@@ -86,6 +87,8 @@ Phase 7: Deployment         [----------] 0%
 | 2 blocks per stage for ResidualAutoencoder | Deeper architecture for better quality | 23.8M params, 16 residual blocks total |
 | CBAM after every residual block | Maximum attention coverage (16 CBAM total) | 24.0M params, +0.7% overhead |
 | batch_size=16-24 for AttentionAutoencoder | batch_size=32 causes OOM on 8GB VRAM | Training constraint documented |
+| 0.7/0.3 MSE/SSIM for Variant C | Emphasize pixel accuracy for PSNR | Implemented in train_attention.ipynb |
+| Full training deferred | ~60+ hours exceeds execution context | User runs notebook manually |
 
 ### Technical Notes
 
@@ -103,17 +106,20 @@ Phase 7: Deployment         [----------] 0%
 - **Building blocks:** PreActResidualBlock, PreActResidualBlockDown, PreActResidualBlockUp, CBAM ready
 - **ResidualAutoencoder (Variant B):** 23.8M params, uses 4GB VRAM at batch=8
 - **AttentionAutoencoder (Variant C):** 24.0M params, 16 CBAM modules, uses 11.7GB VRAM at batch=16
+- **Variant C Training Notebook:** `notebooks/train_attention.ipynb` ready
+- **Quick Test Script:** `scripts/quick_train_attention.py` for verification
 
 ### Blockers
 
-None currently.
+- **Variant C full training pending** - requires ~60+ hours, deferred to user execution
 
 ### TODOs (Deferred Items)
 
+- [ ] Run full Variant C training (30 epochs, ~60+ hours) via notebooks/train_attention.ipynb
+- [ ] Train Variant B (ResidualAutoencoder) for comparison
 - Consider 8x compression variant if 16x insufficient for downstream tasks
 - Full dataset training (currently using 20% subset)
 - Run full evaluation with real SAR data (pipeline ready)
-- Train ResidualAutoencoder and AttentionAutoencoder to compare with ResNet-Lite
 
 ---
 
@@ -122,22 +128,22 @@ None currently.
 ### Last Session
 
 - **Date:** 2026-01-24
-- **Activity:** Phase 4 Plan 03 completed (AttentionAutoencoder - Variant C)
+- **Activity:** Phase 4 Plan 05 completed (Variant C Training Notebook)
 - **Outcome:**
-  - ResidualBlockWithCBAM wrapper combining PreActResidualBlock + CBAM
-  - AttentionEncoder: 4 stages, 8 residual blocks, 8 CBAM modules
-  - AttentionDecoder: bilinear upsample + 1x1 conv, 8 CBAM modules
-  - 24.0M parameters (0.7% overhead from CBAM)
-  - Exported from src.models package
-  - GPU memory: batch=16 OK (11.7GB), batch=32 OOM
+  - Created notebooks/train_attention.ipynb with full training setup
+  - Created scripts/quick_train_attention.py for verification
+  - Quick test passed: model trains correctly (50 batches verified)
+  - Full training deferred (~60+ hours) to user execution
+  - Evaluation pipeline verified with quick test checkpoint
 
 ### Next Session
 
-- **Priority:** Execute Phase 4 Training Plans (if any) or proceed to Phase 5
+- **Priority:** Run full Variant C training OR proceed to Phase 5
 - **Context needed:**
-  - Both Variant B (ResidualAutoencoder) and Variant C (AttentionAutoencoder) ready
-  - Need training to get PSNR/SSIM comparison
-  - May need batch_size reduction for AttentionAutoencoder
+  - Variant C training notebook ready: `notebooks/train_attention.ipynb`
+  - Quick test checkpoint: `notebooks/checkpoints/attention_v1_c16/quick_test.pth`
+  - Expected full training: ~60+ hours for 30 epochs
+  - TensorBoard: `tensorboard --logdir=notebooks/runs`
 
 ---
 
@@ -153,6 +159,7 @@ None currently.
 - Phase 4 Plan 01 Summary: `.planning/phases/04-architecture/04-01-SUMMARY.md`
 - Phase 4 Plan 02 Summary: `.planning/phases/04-architecture/04-02-SUMMARY.md`
 - Phase 4 Plan 03 Summary: `.planning/phases/04-architecture/04-03-SUMMARY.md`
+- Phase 4 Plan 05 Summary: `.planning/phases/04-architecture/04-05-SUMMARY.md`
 
 **Codebase Entry Points:**
 - Preprocessing: `src/data/preprocessing.py`
@@ -178,4 +185,4 @@ None currently.
 
 ---
 
-*State updated: 2026-01-24 (04-03 complete)*
+*State updated: 2026-01-24 (04-05 complete - training notebook ready)*
