@@ -426,6 +426,154 @@ def local_variance_ratio(
 
 
 # ============================================================================
+# Compression Metrics
+# ============================================================================
+
+def compute_compression_ratio(
+    original_size: Union[int, float],
+    compressed_size: Union[int, float]
+) -> float:
+    """
+    Compute compression ratio.
+
+    Compression ratio = original_size / compressed_size
+
+    Args:
+        original_size: Size of original data (bytes, bits, or any unit)
+        compressed_size: Size of compressed data (same unit as original)
+
+    Returns:
+        Compression ratio (e.g., 16.0 means 16:1 compression)
+
+    Example:
+        # For autoencoder: 256x256x1 float32 -> 16x16x16 float32
+        original = 256 * 256 * 1 * 4  # bytes
+        compressed = 16 * 16 * 16 * 4  # bytes
+        ratio = compute_compression_ratio(original, compressed)  # 16.0
+    """
+    if compressed_size <= 0:
+        return float('inf')
+    return float(original_size / compressed_size)
+
+
+def compute_bpp(
+    original_shape: Tuple[int, ...],
+    compressed_bits: Union[int, float]
+) -> float:
+    """
+    Compute Bits Per Pixel (BPP).
+
+    BPP = total_compressed_bits / number_of_pixels
+
+    Args:
+        original_shape: Shape of original image (H, W) or (H, W, C)
+        compressed_bits: Total bits in compressed representation
+
+    Returns:
+        Bits per pixel
+
+    Example:
+        # For autoencoder: 256x256 -> 16x16x16 float32 latent
+        shape = (256, 256)
+        latent_bits = 16 * 16 * 16 * 32  # float32 = 32 bits
+        bpp = compute_bpp(shape, latent_bits)  # 2.0 bpp
+    """
+    num_pixels = original_shape[0] * original_shape[1]
+    if num_pixels <= 0:
+        return float('inf')
+    return float(compressed_bits / num_pixels)
+
+
+def compute_all_metrics(
+    original: np.ndarray,
+    reconstructed: np.ndarray,
+    data_range: float = 1.0
+) -> Dict[str, Union[float, Dict]]:
+    """
+    Compute all available quality metrics in one call.
+
+    This is a convenience function that computes all metrics and returns
+    them in a single dictionary.
+
+    Args:
+        original: Original image (2D numpy array)
+        reconstructed: Reconstructed image (2D numpy array)
+        data_range: Data range of images (default 1.0 for normalized)
+
+    Returns:
+        Dictionary with all metrics:
+        - mse: Mean Squared Error
+        - psnr: Peak Signal-to-Noise Ratio (dB)
+        - ssim: Structural Similarity Index
+        - ms_ssim: Multi-Scale SSIM (or NaN if unavailable)
+        - mae: Mean Absolute Error
+        - epi: Edge Preservation Index
+        - enl_ratio: Dict with ENL statistics
+        - histogram: Dict with histogram similarity metrics
+        - local_variance: Dict with variance ratio and correlation
+        - correlation: Dict with Pearson and Spearman coefficients
+    """
+    metrics = {}
+
+    # Basic metrics
+    metrics['mse'] = SARMetrics.mse(original, reconstructed)
+    metrics['psnr'] = SARMetrics.psnr(original, reconstructed, data_range)
+    metrics['ssim'] = SARMetrics.ssim(original, reconstructed, data_range)
+    metrics['mae'] = SARMetrics.mae(original, reconstructed)
+
+    # MS-SSIM (with error handling)
+    try:
+        metrics['ms_ssim'] = compute_ms_ssim(original, reconstructed, data_range)
+    except Exception:
+        metrics['ms_ssim'] = np.nan
+
+    # SAR-specific metrics
+    metrics['epi'] = edge_preservation_index(original, reconstructed)
+    metrics['enl_ratio'] = enl_ratio(original, reconstructed)
+    metrics['histogram'] = histogram_similarity(original, reconstructed)
+    metrics['local_variance'] = local_variance_ratio(original, reconstructed)
+    metrics['correlation'] = SARMetrics.correlation(original, reconstructed)
+
+    return metrics
+
+
+# ============================================================================
+# Module Exports
+# ============================================================================
+
+__all__ = [
+    # Classes
+    'SARMetrics',
+
+    # ENL functions
+    'find_homogeneous_regions',
+    'compute_enl',
+    'enl_ratio',
+
+    # Edge preservation
+    'edge_preservation_index',
+    'compute_gradient_magnitude',
+
+    # Histogram similarity
+    'histogram_similarity',
+
+    # MS-SSIM
+    'compute_ms_ssim',
+    'PYTORCH_MSSSIM_AVAILABLE',
+
+    # Local variance
+    'local_variance_ratio',
+
+    # Compression metrics
+    'compute_compression_ratio',
+    'compute_bpp',
+
+    # Convenience functions
+    'compute_all_metrics',
+]
+
+
+# ============================================================================
 # SARMetrics Class
 # ============================================================================
 
@@ -649,23 +797,75 @@ class SARMetrics:
 
 
 def test_metrics():
-    """Test metrics."""
-    print("Testing SARMetrics...")
-    
+    """Test all metrics comprehensively."""
+    print("=" * 60)
+    print("Testing SAR Quality Metrics")
+    print("=" * 60)
+
+    # Use larger images for MS-SSIM (requires >= 160x160)
     np.random.seed(42)
-    x = np.random.rand(64, 64).astype(np.float32)
-    x_hat = x + 0.05 * np.random.randn(64, 64)
+    x = np.random.rand(256, 256).astype(np.float32)
+    x_hat = x + 0.03 * np.random.randn(256, 256)
     x_hat = np.clip(x_hat, 0, 1).astype(np.float32)
-    
-    print(f"✓ MSE: {SARMetrics.mse(x, x_hat):.6f}")
-    print(f"✓ PSNR: {SARMetrics.psnr(x, x_hat):.2f} dB")
-    print(f"✓ SSIM: {SARMetrics.ssim(x, x_hat):.4f}")
-    print(f"✓ MAE: {SARMetrics.mae(x, x_hat):.6f}")
-    
+
+    print("\n--- Basic Metrics ---")
+    print(f"MSE: {SARMetrics.mse(x, x_hat):.6f}")
+    print(f"PSNR: {SARMetrics.psnr(x, x_hat):.2f} dB")
+    print(f"SSIM: {SARMetrics.ssim(x, x_hat):.4f}")
+    print(f"MAE: {SARMetrics.mae(x, x_hat):.6f}")
+
+    print("\n--- Correlation ---")
     corr = SARMetrics.correlation(x, x_hat)
-    print(f"✓ Correlation: Pearson={corr['pearson']:.4f}, Spearman={corr['spearman']:.4f}")
-    
-    print("All metric tests passed!")
+    print(f"Pearson: {corr['pearson']:.4f}")
+    print(f"Spearman: {corr['spearman']:.4f}")
+
+    print("\n--- MS-SSIM ---")
+    ms = compute_ms_ssim(x, x_hat)
+    print(f"MS-SSIM: {ms:.4f}" if not np.isnan(ms) else "MS-SSIM: N/A (pytorch-msssim not available)")
+
+    print("\n--- Edge Preservation Index ---")
+    epi = SARMetrics.edge_preservation_index(x, x_hat)
+    print(f"EPI (correlation): {epi:.4f}")
+
+    print("\n--- ENL Ratio ---")
+    enl_result = SARMetrics.enl_ratio(x, x_hat)
+    print(f"ENL original: {enl_result['enl_original']:.2f}")
+    print(f"ENL reconstructed: {enl_result['enl_reconstructed']:.2f}")
+    print(f"ENL ratio: {enl_result['enl_ratio']:.4f}")
+    print(f"Homogeneous fraction: {enl_result['homogeneous_fraction']:.2%}")
+
+    print("\n--- Histogram Similarity ---")
+    hist = SARMetrics.histogram_similarity(x, x_hat)
+    print(f"Intersection: {hist['intersection']:.4f}")
+    print(f"Chi-square: {hist['chi_square']:.4f}")
+    print(f"Bhattacharyya: {hist['bhattacharyya']:.4f}")
+
+    print("\n--- Local Variance Ratio ---")
+    lvr = SARMetrics.local_variance_ratio(x, x_hat)
+    print(f"Variance ratio: {lvr['variance_ratio']:.4f}")
+    print(f"Variance correlation: {lvr['variance_correlation']:.4f}")
+
+    print("\n--- Compression Metrics ---")
+    # Simulate 16x compression: 256x256x1 -> 16x16x16
+    orig_size = 256 * 256 * 1 * 4  # bytes (float32)
+    comp_size = 16 * 16 * 16 * 4   # bytes (float32)
+    cr = compute_compression_ratio(orig_size, comp_size)
+    print(f"Compression ratio (16x example): {cr:.2f}:1")
+
+    latent_bits = 16 * 16 * 16 * 32  # bits
+    bpp = compute_bpp((256, 256), latent_bits)
+    print(f"BPP (16x example): {bpp:.2f}")
+
+    print("\n--- compute_all_metrics() ---")
+    all_metrics = compute_all_metrics(x, x_hat)
+    print(f"Keys: {list(all_metrics.keys())}")
+    print(f"PSNR: {all_metrics['psnr']:.2f} dB")
+    print(f"EPI: {all_metrics['epi']:.4f}")
+    print(f"ENL ratio: {all_metrics['enl_ratio']['enl_ratio']:.4f}")
+
+    print("\n" + "=" * 60)
+    print("All metric tests completed successfully!")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
