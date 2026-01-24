@@ -208,6 +208,16 @@ Plans:
 
 **Estimated Complexity:** High
 
+**Plans:** 6 plans
+
+Plans:
+- [ ] 04-01-PLAN.md - Implement PreActResidualBlock and CBAM attention modules (building blocks)
+- [ ] 04-02-PLAN.md - Create ResidualAutoencoder (Variant B architecture)
+- [ ] 04-03-PLAN.md - Create AttentionAutoencoder (Variant C architecture)
+- [ ] 04-04-PLAN.md - Train Variant B (Residual) at 16x compression
+- [ ] 04-05-PLAN.md - Train Variant C (Attention) at 16x compression
+- [ ] 04-06-PLAN.md - Compare architectures and assess phase success
+
 ### Success Criteria
 
 1. ResidualBlock forward pass preserves spatial dimensions and enables skip connections
@@ -227,19 +237,20 @@ Plans:
 
 ### Deliverables
 
-- `src/models/blocks.py` - ResidualBlock, ResidualBlockWithDownsample, ResidualBlockWithUpsample, CBAM implementations
-- Architecture factory for creating Plain/Residual/Res+CBAM variants
+- `src/models/blocks.py` - PreActResidualBlock, CBAM implementations
+- `src/models/residual_autoencoder.py` - Variant B architecture
+- `src/models/attention_autoencoder.py` - Variant C architecture
 - Trained checkpoints for Variant B (Residual) at 16x compression
 - Trained checkpoints for Variant C (Res+CBAM) at 16x compression
 - Comparison metrics showing improvement over baseline
 
 ### Key Tasks (High-Level)
 
-- [ ] Implement ResidualBlock with skip connections
-- [ ] Implement ResidualBlockWithDownsample for encoder
-- [ ] Implement ResidualBlockWithUpsample for decoder
+- [ ] Implement PreActResidualBlock with pre-activation ordering
+- [ ] Implement PreActResidualBlockDown and PreActResidualBlockUp
 - [ ] Implement ChannelAttention, SpatialAttention, CBAM modules
-- [ ] Create architecture factory for variant selection
+- [ ] Create ResidualAutoencoder (Variant B)
+- [ ] Create AttentionAutoencoder (Variant C)
 - [ ] Train Variant B (Residual) at 16x compression
 - [ ] Train Variant C (Res+CBAM) at 16x compression
 - [ ] Evaluate all variants and compare metrics
@@ -281,7 +292,7 @@ Plans:
 ### Deliverables
 
 - `src/inference/compressor.py` - Complete tiled compression/decompression
-- `src/inference/pipeline.py` - End-to-end raw GeoTIFF → compressed → GeoTIFF pipeline
+- `src/inference/pipeline.py` - End-to-end raw GeoTIFF -> compressed -> GeoTIFF pipeline
 - `compress.py` / `decompress.py` - CLI scripts for end-to-end usage
 - Full scene compression script
 - Blending weight visualization demonstrating smooth transitions
@@ -412,7 +423,7 @@ Plans:
 | 1 - Data Pipeline | Complete | 5/5 |
 | 2 - Baseline Model | Complete | 5/5 |
 | 3 - SAR Evaluation | Complete | 6/6 |
-| 4 - Architecture Enhancement | Not Started | 0/5 |
+| 4 - Architecture Enhancement | In Progress | 0/5 |
 | 5 - Full Image Inference | Not Started | 0/7 |
 | 6 - Final Experiments | Not Started | 0/6 |
 | 7 - Deployment | Not Started | 0/6 |
@@ -467,4 +478,5 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 *Phase 2 planned: 2026-01-21*
 *Phase 3 planned: 2026-01-24*
 *Phase 3 complete: 2026-01-24*
+*Phase 4 planned: 2026-01-24*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
