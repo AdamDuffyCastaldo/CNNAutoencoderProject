@@ -6,21 +6,21 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 2 Complete - Ready for Phase 3 (SAR Evaluation)
+**Current Focus:** Phase 3 In Progress - SAR Evaluation
 
 ---
 
 ## Current Position
 
-**Phase:** 2 of 7 (Baseline Model) - COMPLETE
-**Plan:** 4 of 4 complete
-**Status:** Ready for Phase 3
+**Phase:** 3 of 7 (SAR Evaluation)
+**Plan:** 1 of 3 complete
+**Status:** In progress
 
 **Progress:**
 ```
 Phase 1: Data Pipeline      [##########] 100%
-Phase 2: Baseline Model     [##########] 100%  <- COMPLETE
-Phase 3: SAR Evaluation     [----------] 0%   <- NEXT
+Phase 2: Baseline Model     [##########] 100%
+Phase 3: SAR Evaluation     [###-------] 33%   <- IN PROGRESS
 Phase 4: Architecture       [----------] 0%
 Phase 5: Full Inference     [----------] 0%
 Phase 6: Final Experiments  [----------] 0%
@@ -35,8 +35,8 @@ Phase 7: Deployment         [----------] 0%
 |--------|--------|---------|--------|
 | PSNR @ 16x | >25 dB | 21.2 dB | Below target (expected at 16x) |
 | SSIM @ 16x | >0.85 | 0.726 | Below target |
-| ENL ratio | 0.8-1.2 | - | Phase 3 |
-| EPI | >0.85 | - | Phase 3 |
+| ENL ratio | 0.8-1.2 | - | Metrics ready, awaiting evaluation |
+| EPI | >0.85 | - | Metrics ready, awaiting evaluation |
 
 ### Training Results
 
@@ -66,6 +66,7 @@ Phase 7: Deployment         [----------] 0%
 | ResNet-Lite over full ResNet | 5.6M params sufficient, 22M unnecessary | +0.77 dB over baseline |
 | U-Net abandoned | Skip connections bypass bottleneck | Not suitable for compression |
 | Accept 21 dB at 16x | Within expected range for SAR at 16x | Proceed to evaluation |
+| EPI as correlation not ratio | More robust, bounded output [0, 1] | Implemented in metrics.py |
 
 ### Technical Notes
 
@@ -74,9 +75,10 @@ Phase 7: Deployment         [----------] 0%
 - **Preprocessing params:** vmin=14.7688, vmax=24.5407
 - **Hardware:** RTX 3070 with 8GB VRAM, batch_size=32 with AMP
 - **Best model:** ResNet-Lite (5.6M params) with residual blocks
-- **Compression:** 16x (256x256x1 → 16x16x16 latent)
+- **Compression:** 16x (256x256x1 -> 16x16x16 latent)
 - **Training:** 30 epochs, ~10 hours, 20% data subset
 - **NaN fix:** float32 cast + batch skipping in trainer.py
+- **Metrics module:** 872 lines, 11 metric functions implemented
 
 ### Blockers
 
@@ -94,21 +96,21 @@ None currently.
 ### Last Session
 
 - **Date:** 2026-01-24
-- **Activity:** Phase 2 Plan 04 completed (Training)
+- **Activity:** Phase 3 Plan 01 completed (SAR Metrics)
 - **Outcome:**
-  - Baseline, ResNet-Lite v1, v2 trained
-  - Best: 21.2 dB PSNR, 0.726 SSIM at 16x compression
-  - U-Net abandoned (skip connections bypass bottleneck)
-  - NaN stability fix applied to trainer
+  - Complete metrics module with ENL ratio, EPI, MS-SSIM, histogram similarity
+  - 11 metric functions implemented, 872 lines total
+  - All stubs replaced, comprehensive tests passing
+  - Compression metrics (ratio, BPP) added
 
 ### Next Session
 
-- **Priority:** Plan and execute Phase 3 (SAR Evaluation)
-- **Command:** `/gsd:plan-phase 3`
+- **Priority:** Execute Phase 3 Plan 02 (Traditional Codecs)
+- **Command:** `/gsd:execute-phase 03-02`
 - **Context needed:**
-  - Best checkpoint at `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
-  - Need SAR-specific metrics: ENL, EPI
-  - JPEG-2000 comparison at 16x
+  - Metrics module ready at `src/evaluation/metrics.py`
+  - Need JPEG-2000 codec implementation
+  - Compare against autoencoder at 16x compression
 
 ---
 
@@ -120,6 +122,7 @@ None currently.
 - Research: `.planning/research/SUMMARY.md`
 - Roadmap: `.planning/ROADMAP.md`
 - Phase 2 Training Summary: `.planning/phases/02-baseline-model/02-04-SUMMARY.md`
+- Phase 3 Plan 01 Summary: `.planning/phases/03-sar-evaluation/03-01-SUMMARY.md`
 
 **Codebase Entry Points:**
 - Preprocessing: `src/data/preprocessing.py`
@@ -127,7 +130,7 @@ None currently.
 - DataModule: `src/data/datamodule.py`
 - Models: `src/models/` (SARAutoencoder, ResNetAutoencoder)
 - Training: `src/training/trainer.py`
-- Evaluation: `src/evaluation/` (to be implemented in Phase 3)
+- Evaluation metrics: `src/evaluation/metrics.py`
 
 **Checkpoints:**
 - Baseline: `notebooks/checkpoints/baseline_c16_fast/best.pth`
@@ -135,4 +138,4 @@ None currently.
 
 ---
 
-*State updated: 2026-01-24 (Phase 2 complete)*
+*State updated: 2026-01-24 (Phase 3 Plan 01 complete)*
