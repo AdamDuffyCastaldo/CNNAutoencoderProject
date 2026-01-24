@@ -6,22 +6,22 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 3 Complete - SAR Evaluation
+**Current Focus:** Phase 4 - Architecture Improvements (Plan 1 of 3 complete)
 
 ---
 
 ## Current Position
 
-**Phase:** 3 of 7 (SAR Evaluation) - COMPLETE
-**Plan:** 3 of 3 complete
-**Status:** Phase complete, ready for Phase 4
+**Phase:** 4 of 7 (Architecture Improvements)
+**Plan:** 1 of 3 complete
+**Status:** In progress
 
 **Progress:**
 ```
 Phase 1: Data Pipeline      [##########] 100%
 Phase 2: Baseline Model     [##########] 100%
-Phase 3: SAR Evaluation     [##########] 100%   <- COMPLETE
-Phase 4: Architecture       [----------] 0%
+Phase 3: SAR Evaluation     [##########] 100%
+Phase 4: Architecture       [###-------] 33%    <- IN PROGRESS
 Phase 5: Full Inference     [----------] 0%
 Phase 6: Final Experiments  [----------] 0%
 Phase 7: Deployment         [----------] 0%
@@ -78,6 +78,9 @@ Phase 7: Deployment         [----------] 0%
 | compute_all_metrics unified | Consistent metrics across autoencoder/codec | Evaluator uses single call |
 | JSON split summary/detailed | Summary for review, detailed for analysis | save_results() pattern |
 | R-D format standardized | name, bpp, psnr, ssim for all methods | Enables unified plotting |
+| Pre-activation residual blocks | Cleaner gradient flow for deeper networks | Implemented in blocks.py |
+| CBAM 1x1 conv MLP | More efficient than Linear for attention | Implemented in blocks.py |
+| Bilinear upsample for PreActUp | Cleaner than transposed conv | Implemented in blocks.py |
 
 ### Technical Notes
 
@@ -92,6 +95,7 @@ Phase 7: Deployment         [----------] 0%
 - **Metrics module:** 872 lines, 11 metric functions implemented
 - **Codec baselines:** JPEG-2000, JPEG with binary search calibration
 - **Evaluation pipeline:** 738 lines evaluator, 1099 lines visualizer, 396 lines CLI script
+- **Building blocks:** PreActResidualBlock, PreActResidualBlockDown, PreActResidualBlockUp, CBAM ready
 
 ### Blockers
 
@@ -110,22 +114,21 @@ None currently.
 ### Last Session
 
 - **Date:** 2026-01-24
-- **Activity:** Phase 3 Plan 03 completed (Evaluation Pipeline)
+- **Activity:** Phase 4 Plan 01 completed (Building Blocks)
 - **Outcome:**
-  - Evaluator updated with compute_all_metrics integration
-  - JSON output via save_results() pattern
-  - Visualizer enhanced with zoomed crops and R-D plots
-  - CLI script scripts/evaluate_model.py created
-  - Phase 3 SAR Evaluation complete
+  - PreActResidualBlock with BN->ReLU->Conv ordering implemented
+  - PreActResidualBlockDown and PreActResidualBlockUp added
+  - CBAM (ChannelAttention + SpatialAttention) completed
+  - test_blocks() updated with comprehensive tests
 
 ### Next Session
 
-- **Priority:** Execute Phase 4 (Architecture Improvements)
-- **Command:** `/gsd:plan-phase 04-architecture` or `/gsd:execute-phase 04-01`
+- **Priority:** Execute Phase 4 Plan 02 (Variant Autoencoders)
+- **Command:** `/gsd:execute-plan 04-02`
 - **Context needed:**
-  - Current best model: ResNet-Lite v2 (21.2 dB PSNR, 0.726 SSIM)
-  - Evaluation pipeline ready for testing improvements
-  - Consider attention mechanisms, deeper networks, or quantization
+  - New blocks available: PreActResidualBlock*, CBAM
+  - Will create Variant B (Residual) and Variant C (Residual+CBAM)
+  - Expect 0.3-1.0 dB improvement from pre-activation
 
 ---
 
@@ -137,15 +140,15 @@ None currently.
 - Research: `.planning/research/SUMMARY.md`
 - Roadmap: `.planning/ROADMAP.md`
 - Phase 2 Training Summary: `.planning/phases/02-baseline-model/02-04-SUMMARY.md`
-- Phase 3 Plan 01 Summary: `.planning/phases/03-sar-evaluation/03-01-SUMMARY.md`
-- Phase 3 Plan 02 Summary: `.planning/phases/03-sar-evaluation/03-02-SUMMARY.md`
 - Phase 3 Plan 03 Summary: `.planning/phases/03-sar-evaluation/03-03-SUMMARY.md`
+- Phase 4 Plan 01 Summary: `.planning/phases/04-architecture/04-01-SUMMARY.md`
 
 **Codebase Entry Points:**
 - Preprocessing: `src/data/preprocessing.py`
 - Dataset classes: `src/data/dataset.py`
 - DataModule: `src/data/datamodule.py`
 - Models: `src/models/` (SARAutoencoder, ResNetAutoencoder)
+- Building blocks: `src/models/blocks.py` (includes new PreActResidual*, CBAM)
 - Training: `src/training/trainer.py`
 - Evaluation metrics: `src/evaluation/metrics.py`
 - Codec baselines: `src/evaluation/codec_baselines.py`
@@ -164,4 +167,4 @@ None currently.
 
 ---
 
-*State updated: 2026-01-24 (Phase 3 complete)*
+*State updated: 2026-01-24 (04-01 complete)*
