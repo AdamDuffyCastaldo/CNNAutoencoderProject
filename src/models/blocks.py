@@ -461,76 +461,104 @@ class PreActResidualBlockUp(nn.Module):
 
 class ChannelAttention(nn.Module):
     """
-    Squeeze-and-Excitation style channel attention.
-    
-    Learns to weight channels based on their importance.
-    
+    Squeeze-and-Excitation style channel attention (CBAM variant).
+
+    Uses both max-pool and avg-pool with shared MLP, per CBAM paper.
+
     Args:
         channels: Number of input channels
         reduction: Channel reduction ratio for bottleneck (default 16)
-    
+
+    Returns:
+        Attention weights of shape (B, C, 1, 1) in range [0, 1]
+
     References:
         - Day 4, Section 4.4 of learning guide
         - Hu et al. "Squeeze-and-Excitation Networks" (2018)
+        - Woo et al. "CBAM: Convolutional Block Attention Module" (2018)
     """
-    
+
     def __init__(self, channels: int, reduction: int = 16):
         super().__init__()
-        
-        # TODO: Implement ChannelAttention
-        #
-        # self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        # self.max_pool = nn.AdaptiveMaxPool2d(1)
-        # self.fc = nn.Sequential(
-        #     nn.Linear(channels, channels // reduction, bias=False),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(channels // reduction, channels, bias=False),
-        # )
-        
-        raise NotImplementedError("TODO: Implement ChannelAttention")
-    
+
+        # Handle edge case: ensure at least 1 channel in reduced layer
+        reduced = max(channels // reduction, 1)
+
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+        # Shared MLP using 1x1 convolutions (more efficient than Linear)
+        # NO BatchNorm inside MLP per CBAM paper
+        self.mlp = nn.Sequential(
+            nn.Conv2d(channels, reduced, kernel_size=1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(reduced, channels, kernel_size=1, bias=False)
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply channel attention."""
-        # TODO: Implement forward pass
-        raise NotImplementedError("TODO: Implement forward pass")
+        """Apply channel attention: sigmoid(mlp(avgpool) + mlp(maxpool))."""
+        avg_out = self.mlp(self.avg_pool(x))
+        max_out = self.mlp(self.max_pool(x))
+        return torch.sigmoid(avg_out + max_out)
 
 
 class SpatialAttention(nn.Module):
     """
     Spatial attention module.
-    
-    Learns where to focus spatially using channel-wise statistics.
-    
+
+    Learns where to focus spatially using channel-wise max and mean statistics.
+
     Args:
         kernel_size: Convolution kernel size (default 7)
+
+    Returns:
+        Attention weights of shape (B, 1, H, W) in range [0, 1]
+
+    References:
+        - Woo et al. "CBAM: Convolutional Block Attention Module" (2018)
     """
-    
+
     def __init__(self, kernel_size: int = 7):
         super().__init__()
-        
-        # TODO: Implement SpatialAttention
-        raise NotImplementedError("TODO: Implement SpatialAttention")
-    
+
+        # Padding to preserve spatial dimensions
+        padding = kernel_size // 2
+
+        # Conv takes concatenated [max, mean] -> 1 channel attention map
+        self.conv = nn.Conv2d(
+            2, 1, kernel_size=kernel_size,
+            padding=padding, bias=False
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply spatial attention."""
-        raise NotImplementedError("TODO: Implement forward pass")
+        """Apply spatial attention: sigmoid(conv(concat(maxpool, avgpool)))."""
+        # Channel-wise statistics: (B, 1, H, W)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+
+        # Concatenate and apply convolution
+        concat = torch.cat([max_out, avg_out], dim=1)  # (B, 2, H, W)
+        return torch.sigmoid(self.conv(concat))
 
 
 class CBAM(nn.Module):
     """
     Convolutional Block Attention Module.
-    
-    Combines channel and spatial attention sequentially.
-    
+
+    Combines channel and spatial attention sequentially (channel-first).
+
     Args:
         channels: Number of input channels
-        reduction: Channel attention reduction ratio
-        kernel_size: Spatial attention kernel size
-    
+        reduction: Channel attention reduction ratio (default 16)
+        kernel_size: Spatial attention kernel size (default 7)
+
+    Returns:
+        Refined features with same shape as input
+
     References:
         - Woo et al. "CBAM: Convolutional Block Attention Module" (2018)
     """
-    
+
     def __init__(
         self,
         channels: int,
@@ -538,45 +566,97 @@ class CBAM(nn.Module):
         kernel_size: int = 7
     ):
         super().__init__()
-        
-        # TODO: Implement CBAM
-        #
-        # self.channel_attention = ChannelAttention(channels, reduction)
-        # self.spatial_attention = SpatialAttention(kernel_size)
-        
-        raise NotImplementedError("TODO: Implement CBAM")
-    
+
+        self.channel_attention = ChannelAttention(channels, reduction)
+        self.spatial_attention = SpatialAttention(kernel_size)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply channel then spatial attention."""
-        # TODO: Implement forward pass
-        raise NotImplementedError("TODO: Implement forward pass")
+        """Apply channel attention, then spatial attention."""
+        # Channel attention: refine which channels to focus on
+        x = x * self.channel_attention(x)
+
+        # Spatial attention: refine where to focus spatially
+        x = x * self.spatial_attention(x)
+
+        return x
 
 
 def test_blocks():
     """Test all blocks."""
     print("Testing building blocks...")
-    
+
     x = torch.randn(2, 64, 128, 128)
-    
+
     # Test ConvBlock
     conv_block = ConvBlock(64, 128, stride=2)
     y = conv_block(x)
     assert y.shape == (2, 128, 64, 64), f"ConvBlock wrong shape: {y.shape}"
-    print("✓ ConvBlock")
-    
+    print("[OK] ConvBlock")
+
     # Test DeconvBlock
     deconv_block = DeconvBlock(128, 64, stride=2)
     z = deconv_block(y)
     assert z.shape == (2, 64, 128, 128), f"DeconvBlock wrong shape: {z.shape}"
-    print("✓ DeconvBlock")
-    
+    print("[OK] DeconvBlock")
+
     # Test ResidualBlock
     res_block = ResidualBlock(64)
     r = res_block(x)
     assert r.shape == x.shape, f"ResidualBlock wrong shape: {r.shape}"
-    print("✓ ResidualBlock")
-    
-    print("All block tests passed!")
+    print("[OK] ResidualBlock")
+
+    # Test PreActResidualBlock (stride=1)
+    preact = PreActResidualBlock(64, 64, stride=1)
+    p = preact(x)
+    assert p.shape == x.shape, f"PreActResidualBlock stride=1 wrong shape: {p.shape}"
+    print("[OK] PreActResidualBlock (stride=1)")
+
+    # Test PreActResidualBlock (stride=2)
+    preact_down = PreActResidualBlock(64, 128, stride=2)
+    pd = preact_down(x)
+    assert pd.shape == (2, 128, 64, 64), f"PreActResidualBlock stride=2 wrong shape: {pd.shape}"
+    print("[OK] PreActResidualBlock (stride=2)")
+
+    # Test PreActResidualBlockDown
+    down_block = PreActResidualBlockDown(64, 128)
+    d = down_block(x)
+    assert d.shape == (2, 128, 64, 64), f"PreActResidualBlockDown wrong shape: {d.shape}"
+    print("[OK] PreActResidualBlockDown")
+
+    # Test PreActResidualBlockUp
+    up_block = PreActResidualBlockUp(128, 64)
+    u = up_block(pd)
+    assert u.shape == x.shape, f"PreActResidualBlockUp wrong shape: {u.shape}"
+    print("[OK] PreActResidualBlockUp")
+
+    # Test ChannelAttention
+    ca = ChannelAttention(64, reduction=16)
+    ca_out = ca(x)
+    assert ca_out.shape == (2, 64, 1, 1), f"ChannelAttention wrong shape: {ca_out.shape}"
+    assert (ca_out >= 0).all() and (ca_out <= 1).all(), "ChannelAttention not in [0,1]"
+    print("[OK] ChannelAttention")
+
+    # Test SpatialAttention
+    sa = SpatialAttention(kernel_size=7)
+    sa_out = sa(x)
+    assert sa_out.shape == (2, 1, 128, 128), f"SpatialAttention wrong shape: {sa_out.shape}"
+    assert (sa_out >= 0).all() and (sa_out <= 1).all(), "SpatialAttention not in [0,1]"
+    print("[OK] SpatialAttention")
+
+    # Test CBAM
+    cbam = CBAM(64, reduction=16, kernel_size=7)
+    cbam_out = cbam(x)
+    assert cbam_out.shape == x.shape, f"CBAM wrong shape: {cbam_out.shape}"
+    print("[OK] CBAM")
+
+    # Test CBAM with small channels (edge case)
+    cbam_small = CBAM(8, reduction=16)
+    small_x = torch.randn(2, 8, 32, 32)
+    small_out = cbam_small(small_x)
+    assert small_out.shape == small_x.shape, "CBAM small channels failed"
+    print("[OK] CBAM (small channels)")
+
+    print("\nAll block tests passed!")
 
 
 if __name__ == "__main__":
