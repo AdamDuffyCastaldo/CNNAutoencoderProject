@@ -74,10 +74,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 02-01-PLAN.md - Implement ConvBlock, DeconvBlock, SSIMLoss, CombinedLoss (foundational components)
-- [ ] 02-02-PLAN.md - Implement SAREncoder, SARDecoder, SARAutoencoder (model architecture)
-- [ ] 02-03-PLAN.md - Implement Trainer with TensorBoard, checkpointing, early stopping (training infrastructure)
-- [ ] 02-04-PLAN.md - Create training script and train baseline model (integration and training)
+- [x] 02-01-PLAN.md - Implement ConvBlock, DeconvBlock, SSIMLoss, CombinedLoss (foundational components)
+- [x] 02-02-PLAN.md - Implement SAREncoder, SARDecoder, SARAutoencoder (model architecture)
+- [x] 02-03-PLAN.md - Implement Trainer with TensorBoard, checkpointing, early stopping (training infrastructure)
+- [x] 02-04-PLAN.md - Create training script and train baseline model (integration and training)
 
 ### Success Criteria
 
@@ -125,14 +125,14 @@ Plans:
 
 ### Key Tasks (High-Level)
 
-- [ ] Implement ConvBlock and DeconvBlock in blocks.py
-- [ ] Implement Encoder class with configurable latent channels
-- [ ] Implement Decoder class mirroring encoder
-- [ ] Implement SARAutoencoder wrapper combining encoder/decoder
-- [ ] Implement combined loss function (MSE + SSIM)
-- [ ] Implement Trainer class with all training features
-- [ ] Train baseline model and verify convergence
-- [ ] Validate checkpoint save/load functionality
+- [x] Implement ConvBlock and DeconvBlock in blocks.py
+- [x] Implement Encoder class with configurable latent channels
+- [x] Implement Decoder class mirroring encoder
+- [x] Implement SARAutoencoder wrapper combining encoder/decoder
+- [x] Implement combined loss function (MSE + SSIM)
+- [x] Implement Trainer class with all training features
+- [x] Train baseline model and verify convergence
+- [x] Validate checkpoint save/load functionality
 
 ---
 
@@ -143,6 +143,13 @@ Plans:
 **Dependencies:** Phase 2 (Baseline Model)
 
 **Estimated Complexity:** Medium
+
+**Plans:** 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md - Implement core SAR metrics (ENL ratio, EPI, MS-SSIM, histogram similarity)
+- [ ] 03-02-PLAN.md - Implement traditional codec baselines (JPEG-2000, JPEG with calibration)
+- [ ] 03-03-PLAN.md - Build evaluation infrastructure (Evaluator updates, visualizer enhancements, CLI script)
 
 ### Success Criteria
 
@@ -403,8 +410,8 @@ Plans:
 | Phase | Status | Success Criteria Met |
 |-------|--------|---------------------|
 | 1 - Data Pipeline | Complete | 5/5 |
-| 2 - Baseline Model | In Progress | 3/5 |
-| 3 - SAR Evaluation | Not Started | 0/6 |
+| 2 - Baseline Model | Complete | 5/5 |
+| 3 - SAR Evaluation | Planning Complete | 0/6 |
 | 4 - Architecture Enhancement | Not Started | 0/5 |
 | 5 - Full Image Inference | Not Started | 0/7 |
 | 6 - Final Experiments | Not Started | 0/6 |
@@ -458,4 +465,5 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 
 *Roadmap created: 2026-01-21*
 *Phase 2 planned: 2026-01-21*
+*Phase 3 planned: 2026-01-24*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
