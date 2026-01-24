@@ -147,9 +147,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md - Implement core SAR metrics (ENL ratio, EPI, MS-SSIM, histogram similarity)
-- [ ] 03-02-PLAN.md - Implement traditional codec baselines (JPEG-2000, JPEG with calibration)
-- [ ] 03-03-PLAN.md - Build evaluation infrastructure (Evaluator updates, visualizer enhancements, CLI script)
+- [x] 03-01-PLAN.md - Implement core SAR metrics (ENL ratio, EPI, MS-SSIM, histogram similarity)
+- [x] 03-02-PLAN.md - Implement traditional codec baselines (JPEG-2000, JPEG with calibration)
+- [x] 03-03-PLAN.md - Build evaluation infrastructure (Evaluator updates, visualizer enhancements, CLI script)
 
 ### Success Criteria
 
@@ -186,17 +186,17 @@ Plans:
 
 ### Key Tasks (High-Level)
 
-- [ ] Implement ENL ratio computation (requires homogeneous region detection)
-- [ ] Implement Edge Preservation Index (EPI)
-- [ ] Implement histogram similarity metric
-- [ ] Implement MS-SSIM using pytorch-msssim
-- [ ] Implement compression ratio and BPP calculation
-- [ ] Build Evaluator class for batch evaluation with statistics
-- [ ] Build Visualizer class for comparison images
-- [ ] Implement JPEG-2000 baseline using OpenCV or Pillow (openjpeg backend)
-- [ ] Optionally implement JPEG, WebP baselines for additional comparison
-- [ ] Evaluate traditional codecs on test set with same metrics as autoencoder
-- [ ] Create evaluation script and run on baseline model
+- [x] Implement ENL ratio computation (requires homogeneous region detection)
+- [x] Implement Edge Preservation Index (EPI)
+- [x] Implement histogram similarity metric
+- [x] Implement MS-SSIM using pytorch-msssim
+- [x] Implement compression ratio and BPP calculation
+- [x] Build Evaluator class for batch evaluation with statistics
+- [x] Build Visualizer class for comparison images
+- [x] Implement JPEG-2000 baseline using OpenCV or Pillow (openjpeg backend)
+- [x] Optionally implement JPEG, WebP baselines for additional comparison
+- [x] Evaluate traditional codecs on test set with same metrics as autoencoder
+- [x] Create evaluation script and run on baseline model
 
 ---
 
@@ -411,7 +411,7 @@ Plans:
 |-------|--------|---------------------|
 | 1 - Data Pipeline | Complete | 5/5 |
 | 2 - Baseline Model | Complete | 5/5 |
-| 3 - SAR Evaluation | Planning Complete | 0/6 |
+| 3 - SAR Evaluation | Complete | 6/6 |
 | 4 - Architecture Enhancement | Not Started | 0/5 |
 | 5 - Full Image Inference | Not Started | 0/7 |
 | 6 - Final Experiments | Not Started | 0/6 |
@@ -466,4 +466,5 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 *Roadmap created: 2026-01-21*
 *Phase 2 planned: 2026-01-21*
 *Phase 3 planned: 2026-01-24*
+*Phase 3 complete: 2026-01-24*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
