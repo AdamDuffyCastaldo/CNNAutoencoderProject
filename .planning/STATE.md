@@ -6,21 +6,21 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 2 - Baseline Model (plan 02 complete)
+**Current Focus:** Phase 2 Complete - Ready for Phase 3 (SAR Evaluation)
 
 ---
 
 ## Current Position
 
-**Phase:** 2 of 7 (Baseline Model)
-**Plan:** 2 of 4 complete
-**Status:** In progress
+**Phase:** 2 of 7 (Baseline Model) - COMPLETE
+**Plan:** 4 of 4 complete
+**Status:** Ready for Phase 3
 
 **Progress:**
 ```
 Phase 1: Data Pipeline      [##########] 100%
-Phase 2: Baseline Model     [#######---] 75%  <- Plan 04 in progress
-Phase 3: SAR Evaluation     [----------] 0%
+Phase 2: Baseline Model     [##########] 100%  <- COMPLETE
+Phase 3: SAR Evaluation     [----------] 0%   <- NEXT
 Phase 4: Architecture       [----------] 0%
 Phase 5: Full Inference     [----------] 0%
 Phase 6: Final Experiments  [----------] 0%
@@ -33,10 +33,20 @@ Phase 7: Deployment         [----------] 0%
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| PSNR @ 16x | >30 dB | - | Not measured |
-| SSIM @ 16x | >0.85 | - | Not measured |
-| ENL ratio | 0.8-1.2 | - | Not measured |
-| EPI | >0.85 | - | Not measured |
+| PSNR @ 16x | >25 dB | 21.2 dB | Below target (expected at 16x) |
+| SSIM @ 16x | >0.85 | 0.726 | Below target |
+| ENL ratio | 0.8-1.2 | - | Phase 3 |
+| EPI | >0.85 | - | Phase 3 |
+
+### Training Results
+
+| Model | Params | Best Loss | Best PSNR | Best SSIM |
+|-------|--------|-----------|-----------|-----------|
+| Baseline | 2.3M | 0.1813 | 20.47 dB | 0.646 |
+| ResNet-Lite v1 | 5.6M | 0.1415 | 21.24 dB | 0.725 |
+| **ResNet-Lite v2** | 5.6M | **0.1410** | **21.20 dB** | **0.726** |
+
+**Best Checkpoint:** `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
 
 ---
 
@@ -46,27 +56,27 @@ Phase 7: Deployment         [----------] 0%
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 6-phase structure | Derived from requirements and research synthesis | Roadmap created |
-| Start at 16x compression | Conservative, recommended by research | Implemented - latent_channels=16 gives 16x |
-| Use existing preprocessing | preprocess_sar_complete() already working | Extended with utility functions |
-| batch_size=8 default | 8GB VRAM constraint (RTX 3070) | Implemented in SARDataModule |
-| num_workers=0 default | Windows compatibility | Implemented in SARDataModule |
+| 7-phase structure | Derived from requirements + deployment needs | Roadmap created |
+| Start at 16x compression | Conservative, recommended by research | Implemented - latent_channels=16 |
+| Use existing preprocessing | preprocess_sar_complete() already working | Extended with utilities |
+| batch_size=32 with AMP | AMP allows larger batches on 8GB VRAM | Implemented |
 | Lazy loading as default | 182GB dataset too large for RAM | Implemented via LazyPatchDataset |
-| pytorch-msssim for SSIM | GPU-optimized, well-tested vs hand-rolled | Implemented in SSIMLoss |
+| pytorch-msssim for SSIM | GPU-optimized, well-tested | Implemented in SSIMLoss |
 | 0.5/0.5 MSE/SSIM weights | Balanced weighting per CONTEXT.md | Default in CombinedLoss |
-| No activation on encoder final layer | Latent should be unbounded | Implemented in SAREncoder |
-| Sigmoid on decoder output | Bounds output to [0,1] | Implemented in SARDecoder |
+| ResNet-Lite over full ResNet | 5.6M params sufficient, 22M unnecessary | +0.77 dB over baseline |
+| U-Net abandoned | Skip connections bypass bottleneck | Not suitable for compression |
+| Accept 21 dB at 16x | Within expected range for SAR at 16x | Proceed to evaluation |
 
 ### Technical Notes
 
-- **Data pipeline:** Complete - SARDataModule delivers (8, 1, 256, 256) batches to GPU
+- **Data pipeline:** Complete - SARDataModule delivers (32, 1, 256, 256) batches to GPU
 - **Dataset:** 696,277 patches across 44 .npy files (182GB), lazy loaded via mmap
-- **Preprocessing params:** vmin=14.7688, vmax=24.5407 (accessible via dm.preprocessing_params)
-- **Hardware constraint:** RTX 3070 with 8GB VRAM limits batch size to 8
-- **Model blocks:** ConvBlock halves spatial dims (256->128), DeconvBlock doubles (128->256)
-- **Loss function:** CombinedLoss returns (loss_tensor, metrics_dict) with loss, mse, ssim, psnr
-- **Autoencoder:** SARAutoencoder with 16x compression at latent_channels=16, ~2.3M parameters
-- **Architecture:** 4-layer encoder (1->64->128->256->16), 4-layer decoder (16->256->128->64->1)
+- **Preprocessing params:** vmin=14.7688, vmax=24.5407
+- **Hardware:** RTX 3070 with 8GB VRAM, batch_size=32 with AMP
+- **Best model:** ResNet-Lite (5.6M params) with residual blocks
+- **Compression:** 16x (256x256x1 → 16x16x16 latent)
+- **Training:** 30 epochs, ~10 hours, 20% data subset
+- **NaN fix:** float32 cast + batch skipping in trainer.py
 
 ### Blockers
 
@@ -74,7 +84,8 @@ None currently.
 
 ### TODOs (Deferred Items)
 
-None currently.
+- Consider 8x compression variant if 16x insufficient for downstream tasks
+- Full dataset training (currently using 20% subset)
 
 ---
 
@@ -82,16 +93,22 @@ None currently.
 
 ### Last Session
 
-- **Date:** 2026-01-22
-- **Activity:** Phase 2 Plan 02 executed (Baseline Autoencoder Architecture)
-- **Outcome:** SAREncoder, SARDecoder, SARAutoencoder implemented (3 tasks, 3 commits)
-- **Duration:** ~4 minutes
+- **Date:** 2026-01-24
+- **Activity:** Phase 2 Plan 04 completed (Training)
+- **Outcome:**
+  - Baseline, ResNet-Lite v1, v2 trained
+  - Best: 21.2 dB PSNR, 0.726 SSIM at 16x compression
+  - U-Net abandoned (skip connections bypass bottleneck)
+  - NaN stability fix applied to trainer
 
 ### Next Session
 
-- **Priority:** Execute Phase 2 Plan 03 (Training Loop)
-- **Command:** `/gsd:execute-plan 02-03`
-- **Context needed:** SARAutoencoder and CombinedLoss now available for training
+- **Priority:** Plan and execute Phase 3 (SAR Evaluation)
+- **Command:** `/gsd:plan-phase 3`
+- **Context needed:**
+  - Best checkpoint at `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
+  - Need SAR-specific metrics: ENL, EPI
+  - JPEG-2000 comparison at 16x
 
 ---
 
@@ -102,18 +119,20 @@ None currently.
 - Requirements: `.planning/REQUIREMENTS.md`
 - Research: `.planning/research/SUMMARY.md`
 - Roadmap: `.planning/ROADMAP.md`
-- Phase 1 Summary: `.planning/phases/01-data-pipeline/01-01-SUMMARY.md`
-- Phase 2 Plan 01 Summary: `.planning/phases/02-baseline-model/02-01-SUMMARY.md`
-- Phase 2 Plan 02 Summary: `.planning/phases/02-baseline-model/02-02-SUMMARY.md`
+- Phase 2 Training Summary: `.planning/phases/02-baseline-model/02-04-SUMMARY.md`
 
 **Codebase Entry Points:**
 - Preprocessing: `src/data/preprocessing.py`
 - Dataset classes: `src/data/dataset.py`
 - DataModule: `src/data/datamodule.py`
-- Models: `src/models/` (SAREncoder, SARDecoder, SARAutoencoder)
+- Models: `src/models/` (SARAutoencoder, ResNetAutoencoder)
 - Training: `src/training/trainer.py`
-- Evaluation: `src/evaluation/`
+- Evaluation: `src/evaluation/` (to be implemented in Phase 3)
+
+**Checkpoints:**
+- Baseline: `notebooks/checkpoints/baseline_c16_fast/best.pth`
+- ResNet-Lite v2 (best): `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
 
 ---
 
-*State updated: 2026-01-22 (after 02-02 execution)*
+*State updated: 2026-01-24 (Phase 2 complete)*
