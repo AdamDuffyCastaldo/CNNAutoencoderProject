@@ -6,21 +6,21 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 3 In Progress - SAR Evaluation
+**Current Focus:** Phase 3 Complete - SAR Evaluation
 
 ---
 
 ## Current Position
 
-**Phase:** 3 of 7 (SAR Evaluation)
-**Plan:** 2 of 3 complete
-**Status:** In progress
+**Phase:** 3 of 7 (SAR Evaluation) - COMPLETE
+**Plan:** 3 of 3 complete
+**Status:** Phase complete, ready for Phase 4
 
 **Progress:**
 ```
 Phase 1: Data Pipeline      [##########] 100%
 Phase 2: Baseline Model     [##########] 100%
-Phase 3: SAR Evaluation     [######----] 67%   <- IN PROGRESS
+Phase 3: SAR Evaluation     [##########] 100%   <- COMPLETE
 Phase 4: Architecture       [----------] 0%
 Phase 5: Full Inference     [----------] 0%
 Phase 6: Final Experiments  [----------] 0%
@@ -35,8 +35,8 @@ Phase 7: Deployment         [----------] 0%
 |--------|--------|---------|--------|
 | PSNR @ 16x | >25 dB | 21.2 dB | Below target (expected at 16x) |
 | SSIM @ 16x | >0.85 | 0.726 | Below target |
-| ENL ratio | 0.8-1.2 | - | Metrics ready, awaiting evaluation |
-| EPI | >0.85 | - | Metrics ready, awaiting evaluation |
+| ENL ratio | 0.8-1.2 | Ready | Evaluation pipeline ready |
+| EPI | >0.85 | Ready | Evaluation pipeline ready |
 
 ### Training Results
 
@@ -75,6 +75,9 @@ Phase 7: Deployment         [----------] 0%
 | Accept 21 dB at 16x | Within expected range for SAR at 16x | Proceed to evaluation |
 | EPI as correlation not ratio | More robust, bounded output [0, 1] | Implemented in metrics.py |
 | WebP codec excluded | JPEG-2000+JPEG sufficient per FR4.11 | Implemented in codec_baselines.py |
+| compute_all_metrics unified | Consistent metrics across autoencoder/codec | Evaluator uses single call |
+| JSON split summary/detailed | Summary for review, detailed for analysis | save_results() pattern |
+| R-D format standardized | name, bpp, psnr, ssim for all methods | Enables unified plotting |
 
 ### Technical Notes
 
@@ -88,6 +91,7 @@ Phase 7: Deployment         [----------] 0%
 - **NaN fix:** float32 cast + batch skipping in trainer.py
 - **Metrics module:** 872 lines, 11 metric functions implemented
 - **Codec baselines:** JPEG-2000, JPEG with binary search calibration
+- **Evaluation pipeline:** 738 lines evaluator, 1099 lines visualizer, 396 lines CLI script
 
 ### Blockers
 
@@ -97,6 +101,7 @@ None currently.
 
 - Consider 8x compression variant if 16x insufficient for downstream tasks
 - Full dataset training (currently using 20% subset)
+- Run full evaluation with real SAR data (pipeline ready)
 
 ---
 
@@ -105,22 +110,22 @@ None currently.
 ### Last Session
 
 - **Date:** 2026-01-24
-- **Activity:** Phase 3 Plan 02 completed (Traditional Codec Baselines)
+- **Activity:** Phase 3 Plan 03 completed (Evaluation Pipeline)
 - **Outcome:**
-  - JPEG-2000 and JPEG codecs implemented
-  - Binary search calibration achieves target ratios within 20%
-  - CodecEvaluator with batch evaluation and JSON serialization
-  - 604 lines in codec_baselines.py
+  - Evaluator updated with compute_all_metrics integration
+  - JSON output via save_results() pattern
+  - Visualizer enhanced with zoomed crops and R-D plots
+  - CLI script scripts/evaluate_model.py created
+  - Phase 3 SAR Evaluation complete
 
 ### Next Session
 
-- **Priority:** Execute Phase 3 Plan 03 (Evaluation Pipeline)
-- **Command:** `/gsd:execute-phase 03-03`
+- **Priority:** Execute Phase 4 (Architecture Improvements)
+- **Command:** `/gsd:plan-phase 04-architecture` or `/gsd:execute-phase 04-01`
 - **Context needed:**
-  - Metrics module at `src/evaluation/metrics.py`
-  - Codec baselines at `src/evaluation/codec_baselines.py`
-  - Best checkpoint at `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
-  - Compare autoencoder vs codecs on real SAR patches
+  - Current best model: ResNet-Lite v2 (21.2 dB PSNR, 0.726 SSIM)
+  - Evaluation pipeline ready for testing improvements
+  - Consider attention mechanisms, deeper networks, or quantization
 
 ---
 
@@ -134,6 +139,7 @@ None currently.
 - Phase 2 Training Summary: `.planning/phases/02-baseline-model/02-04-SUMMARY.md`
 - Phase 3 Plan 01 Summary: `.planning/phases/03-sar-evaluation/03-01-SUMMARY.md`
 - Phase 3 Plan 02 Summary: `.planning/phases/03-sar-evaluation/03-02-SUMMARY.md`
+- Phase 3 Plan 03 Summary: `.planning/phases/03-sar-evaluation/03-03-SUMMARY.md`
 
 **Codebase Entry Points:**
 - Preprocessing: `src/data/preprocessing.py`
@@ -143,11 +149,19 @@ None currently.
 - Training: `src/training/trainer.py`
 - Evaluation metrics: `src/evaluation/metrics.py`
 - Codec baselines: `src/evaluation/codec_baselines.py`
+- Evaluator: `src/evaluation/evaluator.py`
+- Visualizer: `src/evaluation/visualizer.py`
+- CLI evaluation: `scripts/evaluate_model.py`
 
 **Checkpoints:**
 - Baseline: `notebooks/checkpoints/baseline_c16_fast/best.pth`
 - ResNet-Lite v2 (best): `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
 
+**Evaluation:**
+- Run: `python scripts/evaluate_model.py --checkpoint path/to/model.pth`
+- With codecs: `python scripts/evaluate_model.py --checkpoint path/to/model.pth --compare-codecs`
+- Output: `evaluations/{model_name}/` with JSON and visualizations
+
 ---
 
-*State updated: 2026-01-24 (Phase 3 Plan 02 complete)*
+*State updated: 2026-01-24 (Phase 3 complete)*
