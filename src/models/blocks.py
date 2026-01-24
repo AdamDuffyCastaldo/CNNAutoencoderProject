@@ -289,6 +289,173 @@ class ResidualBlockWithUpsample(nn.Module):
 
 
 # ============================================================================
+# PRE-ACTIVATION RESIDUAL BLOCKS (ResNet v2)
+# ============================================================================
+
+class PreActResidualBlock(nn.Module):
+    """
+    Pre-activation residual block (ResNet v2 style).
+
+    Structure: x -> BN -> ReLU -> Conv -> BN -> ReLU -> Conv -> (+x)
+
+    Key difference from post-activation: NO ReLU after skip addition.
+    This provides cleaner gradient flow through identity path.
+
+    Args:
+        in_channels: Number of input channels
+        out_channels: Number of output channels
+        stride: Convolution stride (1 preserves spatial, 2 downsamples)
+
+    References:
+        - He et al. "Identity Mappings in Deep Residual Networks" (2016)
+    """
+
+    def __init__(self, in_channels: int, out_channels: int, stride: int = 1):
+        super().__init__()
+
+        # Pre-activation path: BN -> ReLU -> Conv
+        self.bn1 = nn.BatchNorm2d(in_channels)
+        self.conv1 = nn.Conv2d(
+            in_channels, out_channels, kernel_size=3,
+            stride=stride, padding=1, bias=False
+        )
+
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3,
+            stride=1, padding=1, bias=False
+        )
+
+        # Projection shortcut when dimensions change
+        self.need_projection = (stride != 1) or (in_channels != out_channels)
+        if self.need_projection:
+            self.projection = nn.Conv2d(
+                in_channels, out_channels, kernel_size=1,
+                stride=stride, bias=False
+            )
+
+        # Initialize weights
+        self._init_weights()
+
+    def _init_weights(self):
+        """Kaiming initialization for conv weights, standard BN init."""
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass with pre-activation."""
+        # Identity path
+        identity = x
+        if self.need_projection:
+            identity = self.projection(x)
+
+        # Main path: BN -> ReLU -> Conv -> BN -> ReLU -> Conv
+        out = self.bn1(x)
+        out = F.relu(out)
+        out = self.conv1(out)
+
+        out = self.bn2(out)
+        out = F.relu(out)
+        out = self.conv2(out)
+
+        # NO activation after addition (key for pre-activation)
+        return out + identity
+
+
+class PreActResidualBlockDown(nn.Module):
+    """
+    Pre-activation residual block for downsampling.
+
+    Convenience wrapper that applies stride=2 for 2x spatial reduction.
+
+    Args:
+        in_channels: Number of input channels
+        out_channels: Number of output channels
+    """
+
+    def __init__(self, in_channels: int, out_channels: int):
+        super().__init__()
+        self.block = PreActResidualBlock(in_channels, out_channels, stride=2)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.block(x)
+
+
+class PreActResidualBlockUp(nn.Module):
+    """
+    Pre-activation residual block for upsampling.
+
+    Uses bilinear upsample + 1x1 conv for channel change,
+    followed by two pre-activation convolutions.
+
+    Args:
+        in_channels: Number of input channels
+        out_channels: Number of output channels
+        scale_factor: Upsampling factor (default 2)
+    """
+
+    def __init__(self, in_channels: int, out_channels: int, scale_factor: int = 2):
+        super().__init__()
+
+        self.scale_factor = scale_factor
+
+        # Channel projection for skip connection (applied after upsample)
+        self.projection = nn.Conv2d(
+            in_channels, out_channels, kernel_size=1, bias=False
+        )
+
+        # Pre-activation residual convolutions
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.conv1 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3,
+            stride=1, padding=1, bias=False
+        )
+
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3,
+            stride=1, padding=1, bias=False
+        )
+
+        # Initialize weights
+        self._init_weights()
+
+    def _init_weights(self):
+        """Kaiming initialization for conv weights, standard BN init."""
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass with upsampling."""
+        # Upsample then project channels
+        upsampled = F.interpolate(
+            x, scale_factor=self.scale_factor,
+            mode='bilinear', align_corners=False
+        )
+        identity = self.projection(upsampled)
+
+        # Pre-activation path: BN -> ReLU -> Conv -> BN -> ReLU -> Conv
+        out = self.bn1(identity)
+        out = F.relu(out)
+        out = self.conv1(out)
+
+        out = self.bn2(out)
+        out = F.relu(out)
+        out = self.conv2(out)
+
+        # NO activation after addition
+        return out + identity
+
+
+# ============================================================================
 # ATTENTION BLOCKS (Day 4, Advanced)
 # ============================================================================
 
