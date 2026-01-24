@@ -13,14 +13,14 @@
 ## Current Position
 
 **Phase:** 3 of 7 (SAR Evaluation)
-**Plan:** 1 of 3 complete
+**Plan:** 2 of 3 complete
 **Status:** In progress
 
 **Progress:**
 ```
 Phase 1: Data Pipeline      [##########] 100%
 Phase 2: Baseline Model     [##########] 100%
-Phase 3: SAR Evaluation     [###-------] 33%   <- IN PROGRESS
+Phase 3: SAR Evaluation     [######----] 67%   <- IN PROGRESS
 Phase 4: Architecture       [----------] 0%
 Phase 5: Full Inference     [----------] 0%
 Phase 6: Final Experiments  [----------] 0%
@@ -48,6 +48,13 @@ Phase 7: Deployment         [----------] 0%
 
 **Best Checkpoint:** `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
 
+### Codec Baselines (Random Noise Test @ 16x)
+
+| Codec | PSNR | SSIM | Notes |
+|-------|------|------|-------|
+| JPEG-2000 | 18.6 dB | 0.914 | Wavelet-based, best traditional |
+| JPEG | 17.2 dB | 0.886 | DCT-based, blocking artifacts |
+
 ---
 
 ## Accumulated Context
@@ -67,6 +74,7 @@ Phase 7: Deployment         [----------] 0%
 | U-Net abandoned | Skip connections bypass bottleneck | Not suitable for compression |
 | Accept 21 dB at 16x | Within expected range for SAR at 16x | Proceed to evaluation |
 | EPI as correlation not ratio | More robust, bounded output [0, 1] | Implemented in metrics.py |
+| WebP codec excluded | JPEG-2000+JPEG sufficient per FR4.11 | Implemented in codec_baselines.py |
 
 ### Technical Notes
 
@@ -79,6 +87,7 @@ Phase 7: Deployment         [----------] 0%
 - **Training:** 30 epochs, ~10 hours, 20% data subset
 - **NaN fix:** float32 cast + batch skipping in trainer.py
 - **Metrics module:** 872 lines, 11 metric functions implemented
+- **Codec baselines:** JPEG-2000, JPEG with binary search calibration
 
 ### Blockers
 
@@ -96,21 +105,22 @@ None currently.
 ### Last Session
 
 - **Date:** 2026-01-24
-- **Activity:** Phase 3 Plan 01 completed (SAR Metrics)
+- **Activity:** Phase 3 Plan 02 completed (Traditional Codec Baselines)
 - **Outcome:**
-  - Complete metrics module with ENL ratio, EPI, MS-SSIM, histogram similarity
-  - 11 metric functions implemented, 872 lines total
-  - All stubs replaced, comprehensive tests passing
-  - Compression metrics (ratio, BPP) added
+  - JPEG-2000 and JPEG codecs implemented
+  - Binary search calibration achieves target ratios within 20%
+  - CodecEvaluator with batch evaluation and JSON serialization
+  - 604 lines in codec_baselines.py
 
 ### Next Session
 
-- **Priority:** Execute Phase 3 Plan 02 (Traditional Codecs)
-- **Command:** `/gsd:execute-phase 03-02`
+- **Priority:** Execute Phase 3 Plan 03 (Evaluation Pipeline)
+- **Command:** `/gsd:execute-phase 03-03`
 - **Context needed:**
-  - Metrics module ready at `src/evaluation/metrics.py`
-  - Need JPEG-2000 codec implementation
-  - Compare against autoencoder at 16x compression
+  - Metrics module at `src/evaluation/metrics.py`
+  - Codec baselines at `src/evaluation/codec_baselines.py`
+  - Best checkpoint at `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
+  - Compare autoencoder vs codecs on real SAR patches
 
 ---
 
@@ -123,6 +133,7 @@ None currently.
 - Roadmap: `.planning/ROADMAP.md`
 - Phase 2 Training Summary: `.planning/phases/02-baseline-model/02-04-SUMMARY.md`
 - Phase 3 Plan 01 Summary: `.planning/phases/03-sar-evaluation/03-01-SUMMARY.md`
+- Phase 3 Plan 02 Summary: `.planning/phases/03-sar-evaluation/03-02-SUMMARY.md`
 
 **Codebase Entry Points:**
 - Preprocessing: `src/data/preprocessing.py`
@@ -131,6 +142,7 @@ None currently.
 - Models: `src/models/` (SARAutoencoder, ResNetAutoencoder)
 - Training: `src/training/trainer.py`
 - Evaluation metrics: `src/evaluation/metrics.py`
+- Codec baselines: `src/evaluation/codec_baselines.py`
 
 **Checkpoints:**
 - Baseline: `notebooks/checkpoints/baseline_c16_fast/best.pth`
@@ -138,4 +150,4 @@ None currently.
 
 ---
 
-*State updated: 2026-01-24 (Phase 3 Plan 01 complete)*
+*State updated: 2026-01-24 (Phase 3 Plan 02 complete)*
