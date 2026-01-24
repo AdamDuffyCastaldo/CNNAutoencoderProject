@@ -1,0 +1,20 @@
+{
+  "learning_rate": 0.0001,
+  "lr_patience": 5,
+  "lr_factor": 0.5,
+  "max_grad_norm": 1.0,
+  "run_name": "attention_v1_c16",
+  "preprocessing_params": {
+    "vmin": 14.768798828125,
+    "vmax": 24.540729522705078
+  },
+  "use_amp": true,
+  "model_type": "AttentionAutoencoder-Variant-C",
+  "latent_channels": 16,
+  "base_channels": 64,
+  "mse_weight": 0.7,
+  "ssim_weight": 0.3,
+  "batch_size": 16,
+  "epochs": 30,
+  "seed": 42
+}
