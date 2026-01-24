@@ -6,22 +6,22 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 4 - Architecture Improvements (Plan 2 of 3 complete)
+**Current Focus:** Phase 4 - Architecture Improvements (Plan 3 of 3 complete)
 
 ---
 
 ## Current Position
 
 **Phase:** 4 of 7 (Architecture Improvements)
-**Plan:** 2 of 3 complete
-**Status:** In progress
+**Plan:** 3 of 3 complete
+**Status:** Phase complete, ready for training
 
 **Progress:**
 ```
 Phase 1: Data Pipeline      [##########] 100%
 Phase 2: Baseline Model     [##########] 100%
 Phase 3: SAR Evaluation     [##########] 100%
-Phase 4: Architecture       [######----] 67%    <- IN PROGRESS
+Phase 4: Architecture       [##########] 100%    <- COMPLETE
 Phase 5: Full Inference     [----------] 0%
 Phase 6: Final Experiments  [----------] 0%
 Phase 7: Deployment         [----------] 0%
@@ -45,7 +45,8 @@ Phase 7: Deployment         [----------] 0%
 | Baseline | 2.3M | 0.1813 | 20.47 dB | 0.646 |
 | ResNet-Lite v1 | 5.6M | 0.1415 | 21.24 dB | 0.725 |
 | **ResNet-Lite v2** | 5.6M | **0.1410** | **21.20 dB** | **0.726** |
-| ResidualAutoencoder (new) | 23.8M | -- | -- | -- |
+| ResidualAutoencoder (Variant B) | 23.8M | -- | -- | -- |
+| AttentionAutoencoder (Variant C) | 24.0M | -- | -- | -- |
 
 **Best Checkpoint:** `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
 
@@ -83,6 +84,8 @@ Phase 7: Deployment         [----------] 0%
 | CBAM 1x1 conv MLP | More efficient than Linear for attention | Implemented in blocks.py |
 | Bilinear upsample for PreActUp | Cleaner than transposed conv | Implemented in blocks.py |
 | 2 blocks per stage for ResidualAutoencoder | Deeper architecture for better quality | 23.8M params, 16 residual blocks total |
+| CBAM after every residual block | Maximum attention coverage (16 CBAM total) | 24.0M params, +0.7% overhead |
+| batch_size=16-24 for AttentionAutoencoder | batch_size=32 causes OOM on 8GB VRAM | Training constraint documented |
 
 ### Technical Notes
 
@@ -98,7 +101,8 @@ Phase 7: Deployment         [----------] 0%
 - **Codec baselines:** JPEG-2000, JPEG with binary search calibration
 - **Evaluation pipeline:** 738 lines evaluator, 1099 lines visualizer, 396 lines CLI script
 - **Building blocks:** PreActResidualBlock, PreActResidualBlockDown, PreActResidualBlockUp, CBAM ready
-- **ResidualAutoencoder:** 23.8M params, uses 4GB VRAM at batch=8
+- **ResidualAutoencoder (Variant B):** 23.8M params, uses 4GB VRAM at batch=8
+- **AttentionAutoencoder (Variant C):** 24.0M params, 16 CBAM modules, uses 11.7GB VRAM at batch=16
 
 ### Blockers
 
@@ -109,7 +113,7 @@ None currently.
 - Consider 8x compression variant if 16x insufficient for downstream tasks
 - Full dataset training (currently using 20% subset)
 - Run full evaluation with real SAR data (pipeline ready)
-- Train ResidualAutoencoder to compare with ResNet-Lite
+- Train ResidualAutoencoder and AttentionAutoencoder to compare with ResNet-Lite
 
 ---
 
@@ -118,22 +122,22 @@ None currently.
 ### Last Session
 
 - **Date:** 2026-01-24
-- **Activity:** Phase 4 Plan 02 completed (ResidualAutoencoder)
+- **Activity:** Phase 4 Plan 03 completed (AttentionAutoencoder - Variant C)
 - **Outcome:**
-  - PreActResidualEncoder: 4 stages, 2 blocks each (8 total)
-  - PreActResidualDecoder: mirrors encoder with bilinear upsample
-  - ResidualAutoencoder wrapper with same interface as existing models
+  - ResidualBlockWithCBAM wrapper combining PreActResidualBlock + CBAM
+  - AttentionEncoder: 4 stages, 8 residual blocks, 8 CBAM modules
+  - AttentionDecoder: bilinear upsample + 1x1 conv, 8 CBAM modules
+  - 24.0M parameters (0.7% overhead from CBAM)
   - Exported from src.models package
-  - 23.8M parameters, fits in 8GB VRAM
+  - GPU memory: batch=16 OK (11.7GB), batch=32 OOM
 
 ### Next Session
 
-- **Priority:** Execute Phase 4 Plan 03 (Attention Autoencoder - Variant C)
-- **Command:** `/gsd:execute-plan 04-03`
+- **Priority:** Execute Phase 4 Training Plans (if any) or proceed to Phase 5
 - **Context needed:**
-  - ResidualAutoencoder available as baseline for attention variant
-  - CBAM attention module ready from 04-01
-  - Will integrate attention into residual architecture
+  - Both Variant B (ResidualAutoencoder) and Variant C (AttentionAutoencoder) ready
+  - Need training to get PSNR/SSIM comparison
+  - May need batch_size reduction for AttentionAutoencoder
 
 ---
 
@@ -148,12 +152,13 @@ None currently.
 - Phase 3 Plan 03 Summary: `.planning/phases/03-sar-evaluation/03-03-SUMMARY.md`
 - Phase 4 Plan 01 Summary: `.planning/phases/04-architecture/04-01-SUMMARY.md`
 - Phase 4 Plan 02 Summary: `.planning/phases/04-architecture/04-02-SUMMARY.md`
+- Phase 4 Plan 03 Summary: `.planning/phases/04-architecture/04-03-SUMMARY.md`
 
 **Codebase Entry Points:**
 - Preprocessing: `src/data/preprocessing.py`
 - Dataset classes: `src/data/dataset.py`
 - DataModule: `src/data/datamodule.py`
-- Models: `src/models/` (SARAutoencoder, ResNetAutoencoder, ResidualAutoencoder)
+- Models: `src/models/` (SARAutoencoder, ResNetAutoencoder, ResidualAutoencoder, AttentionAutoencoder)
 - Building blocks: `src/models/blocks.py` (includes PreActResidual*, CBAM)
 - Training: `src/training/trainer.py`
 - Evaluation metrics: `src/evaluation/metrics.py`
@@ -173,4 +178,4 @@ None currently.
 
 ---
 
-*State updated: 2026-01-24 (04-02 complete)*
+*State updated: 2026-01-24 (04-03 complete)*
