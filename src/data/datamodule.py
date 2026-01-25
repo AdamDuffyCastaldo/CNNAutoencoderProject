@@ -215,6 +215,9 @@ class _LazySubsetDataset(torch.utils.data.Dataset):
         else:
             self.indices = np.arange(start_idx, end_idx)
 
+        # Cache for memory-mapped files (avoid reopening on every __getitem__)
+        self._file_cache = {}
+
     def __len__(self) -> int:
         return self.length
 
@@ -228,7 +231,12 @@ class _LazySubsetDataset(torch.utils.data.Dataset):
         local_idx = real_idx - self.cumsum[file_idx]
 
         fpath, _ = self.file_index[file_idx]
-        patch = np.load(fpath, mmap_mode='r')[local_idx].copy()  # .copy() critical!
+
+        # Use cached mmap array (avoid reopening file on every access)
+        if fpath not in self._file_cache:
+            self._file_cache[fpath] = np.load(fpath, mmap_mode='r')
+
+        patch = self._file_cache[fpath][local_idx].copy()  # .copy() critical!
 
         if self.augment:
             patch = self._augment(patch)

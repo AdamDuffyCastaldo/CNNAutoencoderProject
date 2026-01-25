@@ -69,6 +69,10 @@ class Trainer:
         self.device = torch.device(device)
         print(f"Using device: {self.device}")
 
+        # Check GPU memory at startup (warn about contention)
+        if torch.cuda.is_available() and device == 'cuda':
+            self._check_gpu_memory()
+
         # Move model and loss to device
         self.model = model.to(self.device)
         self.train_loader = train_loader
@@ -367,6 +371,29 @@ class Trainer:
     def _get_lr(self) -> float:
         """Get current learning rate."""
         return self.optimizer.param_groups[0]['lr']
+
+    def _check_gpu_memory(self):
+        """Check GPU memory at startup and warn if significant memory already in use."""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=memory.used,memory.total', '--format=csv,noheader,nounits'],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                used, total = map(int, result.stdout.strip().split(', '))
+                usage_pct = used / total * 100
+                free_gb = (total - used) / 1024
+
+                if usage_pct > 50:
+                    print(f"\n[WARNING] GPU memory already {usage_pct:.0f}% used ({used}MB / {total}MB)")
+                    print(f"          Only {free_gb:.1f} GB available for training.")
+                    print(f"          If training is slow, restart Jupyter kernel to free GPU memory.")
+                    print(f"          To kill all kernels: 'Kernel > Shutdown All Kernels' in Jupyter\n")
+                else:
+                    print(f"GPU memory: {used}MB / {total}MB ({usage_pct:.0f}% used, {free_gb:.1f} GB free)")
+        except Exception:
+            pass  # Don't fail if nvidia-smi unavailable
 
     def train(self, epochs: int, early_stopping_patience: int = 20) -> List[Dict]:
         """
