@@ -13,7 +13,7 @@
 ## Current Position
 
 **Phase:** 5 of 7 (Full Image Inference)
-**Plan:** 2 of 5 (GeoTIFF I/O)
+**Plan:** 2 of 5 complete
 **Status:** In progress
 
 **Progress:**
@@ -28,11 +28,11 @@ Phase 7: Deployment         [----------] 0%
 ```
 
 **Phase 5 Plans:**
-- [x] 05-01: Research (complete)
+- [x] 05-01: Tiling Infrastructure (complete)
 - [x] 05-02: GeoTIFF I/O (complete)
-- [ ] 05-03: Tiler (pending)
-- [ ] 05-04: Compressor (pending)
-- [ ] 05-05: CLI (pending)
+- [ ] 05-03: Full Image Pipeline (pending)
+- [ ] 05-04: Performance Optimization (pending)
+- [ ] 05-05: CLI Interface (pending)
 
 ---
 
@@ -89,6 +89,8 @@ Phase 7: Deployment         [----------] 0%
 | GeoMetadata dataclass | Clean container for CRS, transform, nodata, tags | Implemented in geotiff.py |
 | COG as optional | Not all users need COG, keep core deps minimal | rio-cogeo commented in requirements |
 | rich for CLI | Better user experience for progress bars | Added to requirements.txt |
+| Offset padding for tiling | Ensures boundary tiles have proper weight coverage | Implemented in tiling.py |
+| Cosine-squared blending | Guarantees overlapping tiles sum to 1.0 | Implemented in tiling.py |
 
 ### Technical Notes
 
@@ -103,6 +105,7 @@ Phase 7: Deployment         [----------] 0%
 - **Building blocks ready:** PreActResidualBlock, PreActResidualBlockDown, PreActResidualBlockUp, CBAM
 - **Training infrastructure:** Warmup epochs, AdamW optimizer, quick search mode ready
 - **GeoTIFF I/O:** read_geotiff, write_geotiff, write_cog with metadata preservation
+- **Tiling:** Cosine-squared blending with offset padding, <1e-7 reconstruction error
 
 ### Blockers
 
@@ -122,17 +125,18 @@ Phase 7: Deployment         [----------] 0%
 ### Last Session
 
 - **Date:** 2026-01-26
-- **Activity:** Phase 5 execution - GeoTIFF I/O module
+- **Activity:** Phase 5 execution - Tiling Infrastructure
 - **Outcome:**
-  - Completed 05-02-PLAN.md (GeoTIFF I/O)
-  - Created src/inference/geotiff.py with read/write/COG support
-  - Added rich to requirements.txt for CLI progress bars
-  - All tests passing
+  - Completed 05-01-PLAN.md (Tiling Infrastructure)
+  - Created src/inference/tiling.py with tile extraction, cosine blending, reconstruction
+  - Round-trip reconstruction error < 1e-7
+  - Visualization helper saved to notebooks/evaluations/blend_weights_sample.png
 
 ### Next Session
 
 - **Priority:** Continue Phase 5 execution (plans 03-05)
 - **Context needed:**
+  - Tiling module ready: src/inference/tiling.py
   - GeoTIFF I/O module ready: src/inference/geotiff.py
   - Best checkpoint: `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
   - Model: ResNetAutoencoder with latent_channels=16, base_channels=32
@@ -164,6 +168,7 @@ Phase 7: Deployment         [----------] 0%
 - Visualizer: `src/evaluation/visualizer.py`
 - CLI evaluation: `scripts/evaluate_model.py`
 - **GeoTIFF I/O: `src/inference/geotiff.py`**
+- **Tiling: `src/inference/tiling.py`**
 
 **Checkpoints:**
 - Baseline: `notebooks/checkpoints/baseline_c16_fast/best.pth`
@@ -176,4 +181,4 @@ Phase 7: Deployment         [----------] 0%
 
 ---
 
-*State updated: 2026-01-26 (Phase 5 plan 02 complete)*
+*State updated: 2026-01-26 (Phase 5 plans 01-02 complete)*
