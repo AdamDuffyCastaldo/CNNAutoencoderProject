@@ -24,6 +24,9 @@ checkpoints/*.ckpt
 *.log
 experiments/*/
 wandb/
+runs/
+notebooks/runs/
+**/events.out.tfevents.*
 
 
 # OS
@@ -49,3 +52,4 @@ train_cell_40.txt
 train_cell_41.txt
 train_cell_43.txt
 train_cell_44.txt
+notebooks/test_files/

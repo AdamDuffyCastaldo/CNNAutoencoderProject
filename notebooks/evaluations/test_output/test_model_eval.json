@@ -1,0 +1,25 @@
+{
+  "model_name": null,
+  "checkpoint_path": null,
+  "evaluation_date": null,
+  "num_samples": null,
+  "preprocessing_params": null,
+  "compression_ratio": null,
+  "metrics": {
+    "mse": 0.008094653487205505,
+    "psnr": 20.91918182373047,
+    "ssim": 0.7263062896715328,
+    "ms_ssim": 0.8146740198135376,
+    "mae": 0.07129941508173943,
+    "epi": 0.8758898597442606,
+    "enl_ratio": 0.8100169299686425,
+    "enl_original": 17.20954079990094,
+    "enl_reconstructed": 13.716111251765756,
+    "hist_intersection": 0.7878799438476551,
+    "hist_bhattacharyya": 0.8922970907705874,
+    "variance_ratio": 1.0958392608377698,
+    "variance_correlation": 0.5511704190865151,
+    "pearson": 0.7937958240509033,
+    "spearman": 0.7715228457370411
+  }
+}

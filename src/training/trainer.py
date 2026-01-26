@@ -3,7 +3,7 @@ Training Manager for SAR Autoencoder
 
 This module implements the main training loop with:
 - Automatic GPU detection
-- Learning rate scheduling
+- Learning rate scheduling with optional warmup
 - Checkpointing (best and latest)
 - TensorBoard logging
 - Early stopping
@@ -37,6 +37,7 @@ class Trainer:
     - Automatic GPU detection
     - Learning rate scheduling (ReduceLROnPlateau)
     - Checkpointing (saves best and latest models)
+    - Timestamped checkpoint archives (prevents accidental overwrites)
     - TensorBoard logging
     - Early stopping
     - Gradient clipping
@@ -83,26 +84,75 @@ class Trainer:
         # Store preprocessing params (critical for SAR data - enables correct inference)
         self.preprocessing_params = config.get('preprocessing_params', None)
 
-        # Optimizer (FR3.3: Adam with configurable lr, default 1e-4)
-        self.optimizer = optim.Adam(
-            model.parameters(),
-            lr=config.get('learning_rate', 1e-4),
-            betas=config.get('betas', (0.9, 0.999)),
-            weight_decay=config.get('weight_decay', 0),
-        )
+        # Learning rate and warmup config
+        self.base_lr = config.get('learning_rate', 1e-4)
+        self.warmup_epochs = config.get('warmup_epochs', 0)
+        self.warmup_start_lr = self.base_lr / 10  # Start at 10% of target LR
 
-        # Scheduler (FR3.4: ReduceLROnPlateau)
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer,
-            mode='min',
-            factor=config.get('lr_factor', 0.5),
-            patience=config.get('lr_patience', 10),
-            verbose=False,  # Handle logging manually via TensorBoard
-        )
+        # Optimizer (FR3.3: Adam/AdamW with configurable lr)
+        optimizer_type = config.get('optimizer', 'adam').lower()
+        weight_decay = config.get('weight_decay', 0)
 
-        # Logging setup
+        if optimizer_type == 'adamw':
+            self.optimizer = optim.AdamW(
+                model.parameters(),
+                lr=self.warmup_start_lr if self.warmup_epochs > 0 else self.base_lr,
+                betas=config.get('betas', (0.9, 0.999)),
+                eps=1e-8,
+                weight_decay=weight_decay if weight_decay > 0 else 1e-5,
+            )
+            print(f"Using AdamW optimizer with weight_decay={self.optimizer.param_groups[0]['weight_decay']}")
+        else:
+            self.optimizer = optim.Adam(
+                model.parameters(),
+                lr=self.warmup_start_lr if self.warmup_epochs > 0 else self.base_lr,
+                betas=config.get('betas', (0.9, 0.999)),
+                weight_decay=weight_decay,
+            )
+
+        if self.warmup_epochs > 0:
+            print(f"Learning rate warmup: {self.warmup_epochs} epochs ({self.warmup_start_lr:.2e} -> {self.base_lr:.2e})")
+
+        # Scheduler (FR3.4: ReduceLROnPlateau, applied after warmup)
+        self.scheduler_type = config.get('scheduler', 'plateau').lower()
+
+        if self.scheduler_type == 'onecycle':
+            # OneCycleLR: steps per batch, includes built-in warmup
+            steps_per_epoch = len(train_loader)
+            total_steps = config.get('epochs', 50) * steps_per_epoch
+            
+            self.scheduler = optim.lr_scheduler.OneCycleLR(
+                self.optimizer,
+                max_lr=self.base_lr,
+                total_steps=total_steps,
+                pct_start=config.get('pct_start', 0.05),  # 5% warmup
+                div_factor=config.get('div_factor', 25),  # initial_lr = max_lr/25
+                final_div_factor=config.get('final_div_factor', 1e4),
+            )
+            # OneCycleLR has built-in warmup, disable manual warmup
+            self.warmup_epochs = 0
+            print(f"Using OneCycleLR: max_lr={self.base_lr:.2e}, {total_steps} total steps")
+        else:
+            # ReduceLROnPlateau: steps per epoch based on val_loss
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                mode='min',
+                factor=config.get('lr_factor', 0.5),
+                patience=config.get('lr_patience', 10),
+                verbose=False,
+            )
+            print(f"Using ReduceLROnPlateau: patience={config.get('lr_patience', 10)}")
+
+        # Logging setup - always append timestamp for unique TensorBoard runs
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.run_name = config.get('run_name', f'baseline_{timestamp}')
+        base_run_name = config.get('run_name', 'baseline')
+
+        # Always generate unique run name unless explicitly disabled
+        if config.get('unique_run_name', True):
+            self.run_name = f"{base_run_name}_{timestamp}"
+        else:
+            self.run_name = base_run_name
+
         self.log_dir = Path(config.get('log_dir', 'runs')) / self.run_name
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.writer = SummaryWriter(self.log_dir)
@@ -207,8 +257,13 @@ class Trainer:
             )
 
             # Update with scaler
+            # Update with scaler
             self.scaler.step(self.optimizer)
             self.scaler.update()
+
+            # Step OneCycleLR per batch (not per epoch)
+            if self.scheduler_type == 'onecycle':
+                self.scheduler.step()
 
             # Accumulate metrics
             for key, value in metrics.items():
@@ -225,6 +280,11 @@ class Trainer:
 
         if nan_batches > 0:
             self.logger.warning(f"Skipped {nan_batches} batches with NaN loss")
+
+        # Handle case where all batches produced NaN
+        if num_batches == 0:
+            self.logger.error("All training batches produced NaN!")
+            return {'loss': float('inf'), 'psnr': 0, 'ssim': 0, 'mse': float('inf')}
 
         return {k: v / num_batches for k, v in epoch_metrics.items()}
 
@@ -280,7 +340,14 @@ class Trainer:
         return {k: v / num_batches for k, v in epoch_metrics.items()}
 
     def save_checkpoint(self, is_best: bool = False):
-        """Save model checkpoint."""
+        """Save model checkpoint.
+
+        Saves:
+        - latest.pth: Always updated (for resumption)
+        - best.pth: Updated when is_best=True
+        - archive/best_YYYYMMDD_HHMMSS.pth: Timestamped copy when is_best=True
+          (prevents accidental overwrites from re-running training)
+        """
         checkpoint = {
             'epoch': self.epoch,
             'global_step': self.global_step,
@@ -293,17 +360,28 @@ class Trainer:
             'config': self.config,
             'preprocessing_params': self.preprocessing_params,  # Critical for SAR!
             'history': self.history,
+            'saved_at': datetime.now().isoformat(),  # Timestamp for reference
         }
 
         # Save latest
         latest_path = self.checkpoint_dir / 'latest.pth'
         torch.save(checkpoint, latest_path)
 
-        # Save best
+        # Save best (with timestamped archive)
         if is_best:
             best_path = self.checkpoint_dir / 'best.pth'
             torch.save(checkpoint, best_path)
-            self.logger.info(f"New best model saved (val_loss: {self.best_val_loss:.4f})")
+
+            # Also save timestamped archive copy (prevents accidental overwrites)
+            if self.config.get('archive_best_checkpoints', True):
+                archive_dir = self.checkpoint_dir / 'archive'
+                archive_dir.mkdir(exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                archive_path = archive_dir / f'best_{timestamp}_epoch{self.epoch:03d}_loss{self.best_val_loss:.4f}.pth'
+                torch.save(checkpoint, archive_path)
+                self.logger.info(f"New best model saved (val_loss: {self.best_val_loss:.4f}) + archived to {archive_path.name}")
+            else:
+                self.logger.info(f"New best model saved (val_loss: {self.best_val_loss:.4f})")
 
     def load_checkpoint(self, path: str):
         """Load model from checkpoint."""
@@ -372,6 +450,23 @@ class Trainer:
         """Get current learning rate."""
         return self.optimizer.param_groups[0]['lr']
 
+    def _update_warmup_lr(self, epoch: int):
+        """Update learning rate during warmup phase (linear warmup)."""
+        if epoch < self.warmup_epochs:
+            # Linear interpolation from warmup_start_lr to base_lr
+            progress = (epoch + 1) / self.warmup_epochs
+            new_lr = self.warmup_start_lr + progress * (self.base_lr - self.warmup_start_lr)
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = new_lr
+            return True  # Still in warmup
+        elif epoch == self.warmup_epochs:
+            # Warmup just finished, set to base_lr
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = self.base_lr
+            self.logger.info(f"Warmup complete. Learning rate set to {self.base_lr:.2e}")
+            return False  # Warmup finished
+        return False  # Past warmup
+
     def _check_gpu_memory(self):
         """Check GPU memory at startup and warn if significant memory already in use."""
         try:
@@ -415,6 +510,9 @@ class Trainer:
         for epoch in range(start_epoch, epochs):
             self.epoch = epoch
 
+            # Update warmup LR at start of epoch (before training)
+            in_warmup = self._update_warmup_lr(epoch) if self.warmup_epochs > 0 else False
+
             # Train
             train_metrics = self.train_epoch()
 
@@ -443,8 +541,9 @@ class Trainer:
             if epoch % 10 == 0:
                 self._log_weight_histograms()
 
-            # Update scheduler (FR3.4)
-            self.scheduler.step(val_metrics['loss'])
+            if self.scheduler_type != 'onecycle':
+                if not in_warmup and epoch >= self.warmup_epochs:
+                    self.scheduler.step(val_metrics['loss'])
 
             # Check for improvement (FR3.8: best model tracking)
             is_best = val_metrics['loss'] < self.best_val_loss
@@ -457,11 +556,11 @@ class Trainer:
             # Save checkpoint (FR3.7)
             self.save_checkpoint(is_best=is_best)
 
-            # Store history
+            # Store history (use .get() for safety when all batches are NaN)
             self.history.append({
                 'epoch': epoch,
-                'train_loss': train_metrics['loss'],
-                'val_loss': val_metrics['loss'],
+                'train_loss': train_metrics.get('loss', float('inf')),
+                'val_loss': val_metrics.get('loss', float('inf')),
                 'train_psnr': train_metrics.get('psnr', 0),
                 'val_psnr': val_metrics.get('psnr', 0),
                 'train_ssim': train_metrics.get('ssim', 0),
@@ -469,12 +568,18 @@ class Trainer:
                 'learning_rate': current_lr,
             })
 
+            # Early abort if training completely diverged (all NaN)
+            if train_metrics.get('loss', 0) == float('inf') and val_metrics.get('loss', 0) == float('inf'):
+                self.logger.error("Training completely diverged (all NaN). Aborting.")
+                self.logger.error("Try: lower learning rate, fresh start, or check for data issues.")
+                break
+
             # Print epoch summary (per CONTEXT.md: with GPU memory)
             gpu_str = f" | GPU: {gpu_mem.get('gpu_allocated_gb', 0):.2f}GB" if gpu_mem else ""
             self.logger.info(
                 f"Epoch {epoch+1}/{epochs} | "
-                f"Train: loss={train_metrics['loss']:.4f}, psnr={train_metrics.get('psnr', 0):.2f}, ssim={train_metrics.get('ssim', 0):.4f} | "
-                f"Val: loss={val_metrics['loss']:.4f}, psnr={val_metrics.get('psnr', 0):.2f}, ssim={val_metrics.get('ssim', 0):.4f} | "
+                f"Train: loss={train_metrics.get('loss', float('inf')):.4f}, psnr={train_metrics.get('psnr', 0):.2f}, ssim={train_metrics.get('ssim', 0):.4f} | "
+                f"Val: loss={val_metrics.get('loss', float('inf')):.4f}, psnr={val_metrics.get('psnr', 0):.2f}, ssim={val_metrics.get('ssim', 0):.4f} | "
                 f"LR: {current_lr:.2e}{gpu_str}"
             )
 

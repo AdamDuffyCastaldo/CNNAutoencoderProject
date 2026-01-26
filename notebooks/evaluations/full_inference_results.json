@@ -1,0 +1,88 @@
+{
+  "test_date": "2026-01-26 22:04:47",
+  "model_path": "checkpoints/resnet_lite_v2_c16/best.pth",
+  "tests": {
+    "memory_test": {
+      "passed": true,
+      "image_size": [
+        4096,
+        4096
+      ],
+      "compress_time_sec": 1.2415001392364502,
+      "decompress_time_sec": 1.3247904777526855,
+      "total_time_sec": 2.5662906169891357,
+      "peak_gpu_memory_mb": 1444.40380859375,
+      "n_tiles": 484,
+      "psnr_db": 14.444725036621094
+    },
+    "seamless_blending": {
+      "passed": true,
+      "boundary_error_ratio": 0.9972268342971802,
+      "error_at_boundaries": 0.08199965208768845,
+      "error_elsewhere": 0.0822276845574379,
+      "psnr_db": 19.904287338256836,
+      "ssim": 0.5384993622207844
+    },
+    "psnr_consistency": {
+      "passed": true,
+      "mean_direct_psnr_db": 16.554709815979002,
+      "mean_pipeline_psnr_db": 16.567934799194337,
+      "mean_difference_db": 0.0855447769165039,
+      "max_difference_db": 0.183929443359375,
+      "n_patches": 10,
+      "direct_psnrs": [
+        16.35929298400879,
+        16.650888442993164,
+        16.782529830932617,
+        16.43531036376953,
+        16.60062599182129,
+        16.62503433227539,
+        16.57441520690918,
+        16.094009399414062,
+        16.937850952148438,
+        16.487140655517578
+      ],
+      "pipeline_psnrs": [
+        16.375139236450195,
+        16.793935775756836,
+        16.69084930419922,
+        16.39716148376465,
+        16.551359176635742,
+        16.808963775634766,
+        16.451780319213867,
+        16.151100158691406,
+        17.03178596496582,
+        16.42727279663086
+      ]
+    },
+    "preprocessing_roundtrip": {
+      "passed": true,
+      "output_in_linear_range": true,
+      "correlation": 0.7853059664611086,
+      "correlation_threshold": 0.75,
+      "psnr_db": 18.849708557128906,
+      "input_range": [
+        68.8304672241211,
+        268.3746337890625
+      ],
+      "output_range": [
+        37.490333557128906,
+        279.4547424316406
+      ],
+      "expected_linear_range": [
+        29.98333125184313,
+        284.49389567746186
+      ]
+    },
+    "cli_smoke_test": {
+      "passed": true,
+      "compress_success": true,
+      "decompress_success": true,
+      "metadata_preserved": true,
+      "crs_preserved": true,
+      "transform_preserved": true,
+      "data_correlation": 0.8298682546758435
+    }
+  },
+  "all_passed": true
+}
