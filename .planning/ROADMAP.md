@@ -208,15 +208,17 @@ Plans:
 
 **Estimated Complexity:** High
 
+**Status:** Partial completion (building blocks complete, training deferred)
+
 **Plans:** 6 plans
 
 Plans:
-- [ ] 04-01-PLAN.md - Implement PreActResidualBlock and CBAM attention modules (building blocks)
-- [ ] 04-02-PLAN.md - Create ResidualAutoencoder (Variant B architecture)
-- [ ] 04-03-PLAN.md - Create AttentionAutoencoder (Variant C architecture)
-- [ ] 04-04-PLAN.md - Train Variant B (Residual) at 16x compression
-- [ ] 04-05-PLAN.md - Train Variant C (Attention) at 16x compression
-- [ ] 04-06-PLAN.md - Compare architectures and assess phase success
+- [x] 04-01-PLAN.md - Implement PreActResidualBlock and CBAM attention modules (building blocks)
+- [x] 04-02-PLAN.md - Create ResidualAutoencoder (Variant B architecture)
+- [x] 04-03-PLAN.md - Create AttentionAutoencoder (Variant C architecture)
+- [ ] 04-04-PLAN.md - Train Variant B (Residual) at 16x compression (deferred)
+- [ ] 04-05-PLAN.md - Train Variant C (Attention) at 16x compression (deferred)
+- [x] 04-06-PLAN.md - Compare architectures and assess phase success (partial)
 
 ### Success Criteria
 
@@ -225,6 +227,8 @@ Plans:
 3. Residual architecture (Variant B) achieves PSNR at least 1.5 dB higher than baseline at same compression ratio
 4. Residual+CBAM architecture (Variant C) achieves PSNR at least 0.5 dB higher than Variant B
 5. All architecture variants maintain ENL ratio between 0.8-1.2 (no over-smoothing)
+
+**Current Status:** 3/5 criteria met, 2 deferred. Best available: ResNet-Lite v2 at 21.2 dB PSNR.
 
 ### Requirements Mapped
 
@@ -246,14 +250,14 @@ Plans:
 
 ### Key Tasks (High-Level)
 
-- [ ] Implement PreActResidualBlock with pre-activation ordering
-- [ ] Implement PreActResidualBlockDown and PreActResidualBlockUp
-- [ ] Implement ChannelAttention, SpatialAttention, CBAM modules
-- [ ] Create ResidualAutoencoder (Variant B)
-- [ ] Create AttentionAutoencoder (Variant C)
-- [ ] Train Variant B (Residual) at 16x compression
-- [ ] Train Variant C (Res+CBAM) at 16x compression
-- [ ] Evaluate all variants and compare metrics
+- [x] Implement PreActResidualBlock with pre-activation ordering
+- [x] Implement PreActResidualBlockDown and PreActResidualBlockUp
+- [x] Implement ChannelAttention, SpatialAttention, CBAM modules
+- [x] Create ResidualAutoencoder (Variant B)
+- [x] Create AttentionAutoencoder (Variant C)
+- [ ] Train Variant B (Residual) at 16x compression (deferred)
+- [ ] Train Variant C (Res+CBAM) at 16x compression (deferred)
+- [x] Evaluate all variants and compare metrics (partial - using available models)
 
 ---
 
@@ -264,6 +268,15 @@ Plans:
 **Dependencies:** Phase 4 (Architecture Enhancement)
 
 **Estimated Complexity:** Medium-High
+
+**Plans:** 5 plans
+
+Plans:
+- [ ] 05-01-PLAN.md - Tiling infrastructure (extraction, blending weights, reconstruction)
+- [ ] 05-02-PLAN.md - GeoTIFF I/O with metadata preservation
+- [ ] 05-03-PLAN.md - SARCompressor implementation (tiled compression/decompression)
+- [ ] 05-04-PLAN.md - CLI interface (sarcodec compress/decompress)
+- [ ] 05-05-PLAN.md - Full pipeline validation and benchmarking
 
 ### Success Criteria
 
@@ -291,26 +304,26 @@ Plans:
 
 ### Deliverables
 
+- `src/inference/tiling.py` - Tile extraction, blending weights, reconstruction
+- `src/inference/geotiff.py` - GeoTIFF I/O with metadata preservation
 - `src/inference/compressor.py` - Complete tiled compression/decompression
-- `src/inference/pipeline.py` - End-to-end raw GeoTIFF -> compressed -> GeoTIFF pipeline
-- `compress.py` / `decompress.py` - CLI scripts for end-to-end usage
-- Full scene compression script
+- `scripts/sarcodec.py` - CLI with compress/decompress subcommands
+- `notebooks/test_full_inference.ipynb` - Validation notebook
 - Blending weight visualization demonstrating smooth transitions
 - Performance benchmarks (time, memory) for full scene processing
 
 ### Key Tasks (High-Level)
 
-- [ ] Implement single patch encode/decode in compressor
-- [ ] Implement tiled processing with configurable overlap
 - [ ] Implement cosine ramp blending weights
-- [ ] Implement memory-efficient batch processing
-- [ ] Implement inverse preprocessing for output
-- [ ] Implement raw GeoTIFF loading with rasterio (reuse Phase 1 preprocessing)
-- [ ] Implement automatic preprocessing using checkpoint's saved parameters
-- [ ] Implement GeoTIFF output with preserved metadata (CRS, transform, nodata)
-- [ ] Create CLI interface: `python compress.py input.tif -o compressed.bin --model best.pth`
-- [ ] Create CLI interface: `python decompress.py compressed.bin -o output.tif`
-- [ ] Test on full Sentinel-1 scene and verify seamlessness
+- [ ] Implement tiled extraction with reflection padding
+- [ ] Implement weighted reconstruction from tiles
+- [ ] Implement GeoTIFF reading with metadata extraction
+- [ ] Implement GeoTIFF writing with metadata preservation
+- [ ] Implement SARCompressor with model loading and preprocessing
+- [ ] Implement batched tiled inference with progress callbacks
+- [ ] Create CLI with compress/decompress subcommands
+- [ ] Test on synthetic large images (no visible tile boundaries)
+- [ ] Verify round-trip PSNR consistency
 - [ ] Benchmark processing time and memory usage
 
 ---
@@ -423,7 +436,7 @@ Plans:
 | 1 - Data Pipeline | Complete | 5/5 |
 | 2 - Baseline Model | Complete | 5/5 |
 | 3 - SAR Evaluation | Complete | 6/6 |
-| 4 - Architecture Enhancement | In Progress | 0/5 |
+| 4 - Architecture Enhancement | Partial | 3/5 (training deferred) |
 | 5 - Full Image Inference | Not Started | 0/7 |
 | 6 - Final Experiments | Not Started | 0/6 |
 | 7 - Deployment | Not Started | 0/6 |
@@ -479,4 +492,6 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 *Phase 3 planned: 2026-01-24*
 *Phase 3 complete: 2026-01-24*
 *Phase 4 planned: 2026-01-24*
+*Phase 4 partial: 2026-01-26 (building blocks complete, training deferred)*
+*Phase 5 planned: 2026-01-26*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
