@@ -234,6 +234,105 @@ def apply_nodata_mask(
     return result
 
 
+# COG support flag - set at module level
+_COG_AVAILABLE = False
+try:
+    from rio_cogeo.cogeo import cog_translate
+    from rio_cogeo.profiles import cog_profiles
+    _COG_AVAILABLE = True
+except ImportError:
+    pass
+
+
+def write_cog(
+    data: np.ndarray,
+    metadata: GeoMetadata,
+    path: Union[str, Path]
+) -> None:
+    """
+    Write a Cloud Optimized GeoTIFF (COG) with metadata preservation.
+
+    COGs are optimized for cloud storage and HTTP range requests,
+    enabling efficient partial reads of large images.
+
+    If rio-cogeo is not installed, falls back to standard GeoTIFF
+    with a warning.
+
+    Args:
+        data: NumPy array of shape (H, W) or (count, H, W)
+        metadata: GeoMetadata object with geospatial info
+        path: Output file path
+
+    Example:
+        >>> write_cog(compressed_data, original_meta, 'output_cog.tif')
+    """
+    if not _COG_AVAILABLE:
+        warnings.warn(
+            "rio-cogeo not installed. Falling back to standard GeoTIFF. "
+            "Install with: pip install rio-cogeo",
+            UserWarning
+        )
+        write_geotiff(data, metadata, path, compress='deflate')
+        return
+
+    from rasterio.io import MemoryFile
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Handle 2D (single band) and 3D (multi-band) data
+    if data.ndim == 2:
+        data = data[np.newaxis, ...]
+        count = 1
+    else:
+        count = data.shape[0]
+
+    height, width = data.shape[1], data.shape[2]
+
+    # Build profile for temp file
+    profile = {
+        'driver': 'GTiff',
+        'dtype': data.dtype.name,
+        'width': width,
+        'height': height,
+        'count': count,
+        'crs': metadata.crs,
+        'transform': metadata.transform,
+        'nodata': metadata.nodata,
+    }
+
+    # Write to memory file first, then convert to COG
+    with MemoryFile() as memfile:
+        with memfile.open(**profile) as mem:
+            mem.write(data)
+
+            # Write tags if present
+            if metadata.tags:
+                mem.update_tags(**metadata.tags)
+
+            # Write band descriptions if present
+            if metadata.descriptions:
+                for i, desc in enumerate(metadata.descriptions[:count], start=1):
+                    if desc:
+                        mem.set_band_description(i, desc)
+
+        # Use deflate profile for COG
+        cog_profile = cog_profiles.get('deflate')
+
+        # Translate to COG
+        cog_translate(
+            memfile,
+            str(path),
+            cog_profile,
+            quiet=True
+        )
+
+
+def is_cog_available() -> bool:
+    """Check if COG support is available."""
+    return _COG_AVAILABLE
+
+
 def test_geotiff_io():
     """
     Test GeoTIFF I/O with round-trip verification.
@@ -334,6 +433,20 @@ def test_geotiff_io():
         assert multi_read.shape == (3, 64, 64), f"Multi-band shape wrong: {multi_read.shape}"
         np.testing.assert_array_almost_equal(multi_band_data, multi_read, decimal=5)
         print("  - Multi-band support: OK")
+
+        # Test COG support
+        cog_path = os.path.join(tmpdir, 'test_cog.tif')
+        write_cog(data, metadata, cog_path)
+        assert os.path.exists(cog_path), "COG file not created"
+
+        if is_cog_available():
+            # Verify COG is readable
+            cog_read, cog_meta = read_geotiff(cog_path)
+            # COG compression may cause minor differences, use lower precision
+            np.testing.assert_array_almost_equal(data, cog_read, decimal=4)
+            print("  - write_cog (with rio-cogeo): OK")
+        else:
+            print("  - write_cog (fallback to GeoTIFF): OK")
 
     print("\nAll GeoTIFF I/O tests passed!")
 
