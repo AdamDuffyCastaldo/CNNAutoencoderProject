@@ -13,7 +13,7 @@
 ## Current Position
 
 **Phase:** 5 of 7 (Full Image Inference)
-**Plan:** 3 of 5 complete
+**Plan:** 4 of 5 complete
 **Status:** In progress
 
 **Progress:**
@@ -22,7 +22,7 @@ Phase 1: Data Pipeline      [##########] 100%
 Phase 2: Baseline Model     [##########] 100%
 Phase 3: SAR Evaluation     [##########] 100%
 Phase 4: Architecture       [########--] 83%    <- Partial (training deferred)
-Phase 5: Full Inference     [######----] 60%    <- IN PROGRESS
+Phase 5: Full Inference     [########--] 80%    <- IN PROGRESS
 Phase 6: Final Experiments  [----------] 0%
 Phase 7: Deployment         [----------] 0%
 ```
@@ -31,7 +31,7 @@ Phase 7: Deployment         [----------] 0%
 - [x] 05-01: Tiling Infrastructure (complete)
 - [x] 05-02: GeoTIFF I/O (complete)
 - [x] 05-03: SARCompressor (complete)
-- [ ] 05-04: CLI Interface (pending)
+- [x] 05-04: CLI Interface (complete)
 - [ ] 05-05: Full Validation (pending)
 
 ---
@@ -94,6 +94,9 @@ Phase 7: Deployment         [----------] 0%
 | Preprocess params from checkpoint | Extract from config['preprocessing_params'] | Implemented in SARCompressor |
 | Auto-detect batch size | 70% VRAM, 3MB per tile estimate | Implemented in SARCompressor |
 | SAR-like test data | Model trained on SAR, random noise OOD | Test validates 21.94 dB PSNR |
+| GeoMetadata JSON serialization | CRS as WKT, transform as tuple for NPZ compatibility | Implemented in sarcodec.py |
+| CLI exit codes | Distinct codes enable scripting/automation | 0=success, 1=file, 2=model, 3=OOM, 4=general |
+| Nodata handling in compression | Replace with median, store mask separately | Enables lossless nodata preservation |
 
 ### Technical Notes
 
@@ -129,24 +132,24 @@ Phase 7: Deployment         [----------] 0%
 ### Last Session
 
 - **Date:** 2026-01-26
-- **Activity:** Phase 5 execution - SARCompressor implementation
+- **Activity:** Phase 5 execution - CLI Interface implementation
 - **Outcome:**
-  - Completed 05-03-PLAN.md (SARCompressor)
-  - Created full SARCompressor class in src/inference/compressor.py
-  - Batched GPU inference with AMP support
-  - Progress callbacks for CLI integration
-  - Validated 21.94 dB PSNR on SAR-like synthetic data
+  - Completed 05-04-PLAN.md (CLI Interface)
+  - Created sarcodec CLI with compress/decompress subcommands
+  - Rich progress bars with ETA
+  - Distinct exit codes for error handling
+  - Verified round-trip metadata preservation
 
 ### Next Session
 
-- **Priority:** Continue Phase 5 execution (plans 04-05)
+- **Priority:** Complete Phase 5 with plan 05-05 (Full Validation)
 - **Context needed:**
+  - CLI ready: scripts/sarcodec.py (compress/decompress commands)
   - SARCompressor ready: src/inference/compressor.py
-  - Tiling module ready: src/inference/tiling.py
-  - GeoTIFF I/O module ready: src/inference/geotiff.py
+  - GeoTIFF I/O ready: src/inference/geotiff.py
   - Best checkpoint: `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
 - **Commands:**
-  - `/gsd:execute-phase 05` - Continue Phase 5 execution
+  - `/gsd:execute-phase 05` - Complete Phase 5 execution
 
 ---
 
@@ -175,6 +178,7 @@ Phase 7: Deployment         [----------] 0%
 - **SARCompressor: `src/inference/compressor.py`**
 - **GeoTIFF I/O: `src/inference/geotiff.py`**
 - **Tiling: `src/inference/tiling.py`**
+- **CLI: `scripts/sarcodec.py`** (compress/decompress commands)
 
 **Checkpoints:**
 - Baseline: `notebooks/checkpoints/baseline_c16_fast/best.pth`
@@ -187,4 +191,4 @@ Phase 7: Deployment         [----------] 0%
 
 ---
 
-*State updated: 2026-01-26 (Phase 5 plan 03 complete)*
+*State updated: 2026-01-26 (Phase 5 plan 04 complete)*
