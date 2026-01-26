@@ -13,7 +13,7 @@
 ## Current Position
 
 **Phase:** 5 of 7 (Full Image Inference)
-**Plan:** 2 of 5 complete
+**Plan:** 3 of 5 complete
 **Status:** In progress
 
 **Progress:**
@@ -22,7 +22,7 @@ Phase 1: Data Pipeline      [##########] 100%
 Phase 2: Baseline Model     [##########] 100%
 Phase 3: SAR Evaluation     [##########] 100%
 Phase 4: Architecture       [########--] 83%    <- Partial (training deferred)
-Phase 5: Full Inference     [####------] 40%    <- IN PROGRESS
+Phase 5: Full Inference     [######----] 60%    <- IN PROGRESS
 Phase 6: Final Experiments  [----------] 0%
 Phase 7: Deployment         [----------] 0%
 ```
@@ -30,9 +30,9 @@ Phase 7: Deployment         [----------] 0%
 **Phase 5 Plans:**
 - [x] 05-01: Tiling Infrastructure (complete)
 - [x] 05-02: GeoTIFF I/O (complete)
-- [ ] 05-03: Full Image Pipeline (pending)
-- [ ] 05-04: Performance Optimization (pending)
-- [ ] 05-05: CLI Interface (pending)
+- [x] 05-03: SARCompressor (complete)
+- [ ] 05-04: CLI Interface (pending)
+- [ ] 05-05: Full Validation (pending)
 
 ---
 
@@ -91,6 +91,9 @@ Phase 7: Deployment         [----------] 0%
 | rich for CLI | Better user experience for progress bars | Added to requirements.txt |
 | Offset padding for tiling | Ensures boundary tiles have proper weight coverage | Implemented in tiling.py |
 | Cosine-squared blending | Guarantees overlapping tiles sum to 1.0 | Implemented in tiling.py |
+| Preprocess params from checkpoint | Extract from config['preprocessing_params'] | Implemented in SARCompressor |
+| Auto-detect batch size | 70% VRAM, 3MB per tile estimate | Implemented in SARCompressor |
+| SAR-like test data | Model trained on SAR, random noise OOD | Test validates 21.94 dB PSNR |
 
 ### Technical Notes
 
@@ -106,6 +109,7 @@ Phase 7: Deployment         [----------] 0%
 - **Training infrastructure:** Warmup epochs, AdamW optimizer, quick search mode ready
 - **GeoTIFF I/O:** read_geotiff, write_geotiff, write_cog with metadata preservation
 - **Tiling:** Cosine-squared blending with offset padding, <1e-7 reconstruction error
+- **SARCompressor:** Full pipeline with batched GPU inference, AMP support, progress callbacks
 
 ### Blockers
 
@@ -125,21 +129,22 @@ Phase 7: Deployment         [----------] 0%
 ### Last Session
 
 - **Date:** 2026-01-26
-- **Activity:** Phase 5 execution - Tiling Infrastructure
+- **Activity:** Phase 5 execution - SARCompressor implementation
 - **Outcome:**
-  - Completed 05-01-PLAN.md (Tiling Infrastructure)
-  - Created src/inference/tiling.py with tile extraction, cosine blending, reconstruction
-  - Round-trip reconstruction error < 1e-7
-  - Visualization helper saved to notebooks/evaluations/blend_weights_sample.png
+  - Completed 05-03-PLAN.md (SARCompressor)
+  - Created full SARCompressor class in src/inference/compressor.py
+  - Batched GPU inference with AMP support
+  - Progress callbacks for CLI integration
+  - Validated 21.94 dB PSNR on SAR-like synthetic data
 
 ### Next Session
 
-- **Priority:** Continue Phase 5 execution (plans 03-05)
+- **Priority:** Continue Phase 5 execution (plans 04-05)
 - **Context needed:**
+  - SARCompressor ready: src/inference/compressor.py
   - Tiling module ready: src/inference/tiling.py
   - GeoTIFF I/O module ready: src/inference/geotiff.py
   - Best checkpoint: `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
-  - Model: ResNetAutoencoder with latent_channels=16, base_channels=32
 - **Commands:**
   - `/gsd:execute-phase 05` - Continue Phase 5 execution
 
@@ -167,6 +172,7 @@ Phase 7: Deployment         [----------] 0%
 - Evaluator: `src/evaluation/evaluator.py`
 - Visualizer: `src/evaluation/visualizer.py`
 - CLI evaluation: `scripts/evaluate_model.py`
+- **SARCompressor: `src/inference/compressor.py`**
 - **GeoTIFF I/O: `src/inference/geotiff.py`**
 - **Tiling: `src/inference/tiling.py`**
 
@@ -181,4 +187,4 @@ Phase 7: Deployment         [----------] 0%
 
 ---
 
-*State updated: 2026-01-26 (Phase 5 plans 01-02 complete)*
+*State updated: 2026-01-26 (Phase 5 plan 03 complete)*
