@@ -258,6 +258,68 @@ def reconstruct_from_tiles(
     return output
 
 
+def visualize_blend_weights(
+    tile_size: int,
+    overlap: int,
+    output_path: Optional[str] = None
+) -> None:
+    """
+    Visualize the blending weights used for tile reconstruction.
+
+    Creates a figure showing:
+    1. 2D heatmap of the weights
+    2. 1D cross-section through the horizontal center
+
+    This is useful for debugging blending and verifying smooth transitions.
+
+    Args:
+        tile_size: Size of square tiles (pixels)
+        overlap: Number of pixels overlap between adjacent tiles
+        output_path: If provided, save figure to this path; otherwise display
+
+    Returns:
+        None
+    """
+    import matplotlib.pyplot as plt
+
+    weights = create_cosine_ramp_weights(tile_size, overlap)
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # 2D heatmap
+    im = axes[0].imshow(weights, cmap='viridis', aspect='equal')
+    axes[0].set_title(f'Blend Weights (tile={tile_size}, overlap={overlap})')
+    axes[0].set_xlabel('X (pixels)')
+    axes[0].set_ylabel('Y (pixels)')
+    plt.colorbar(im, ax=axes[0], label='Weight')
+
+    # 1D cross-section through center
+    center = tile_size // 2
+    cross_section = weights[center, :]
+    axes[1].plot(cross_section, 'b-', linewidth=2)
+    axes[1].axvline(x=overlap, color='r', linestyle='--', alpha=0.7, label=f'Overlap boundary ({overlap})')
+    axes[1].axvline(x=tile_size - overlap, color='r', linestyle='--', alpha=0.7)
+    axes[1].axhline(y=0.5, color='gray', linestyle=':', alpha=0.5)
+    axes[1].set_xlim(0, tile_size)
+    axes[1].set_ylim(0, 1.05)
+    axes[1].set_xlabel('Position (pixels)')
+    axes[1].set_ylabel('Weight')
+    axes[1].set_title(f'Horizontal Cross-Section (y={center})')
+    axes[1].legend()
+    axes[1].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if output_path:
+        import os
+        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"Saved blend weights visualization to: {output_path}")
+    else:
+        plt.show()
+
+
 def test_tiling():
     """
     Test the tiling functions to verify correctness.
@@ -267,6 +329,9 @@ def test_tiling():
     2. Weight summation in overlap regions
     3. Round-trip reconstruction accuracy
     4. Various image sizes
+    5. Zero overlap
+    6. Small images
+    7. Visualization output
     """
     print("Testing tiling module...")
 
@@ -374,6 +439,44 @@ def test_tiling():
     print(f"   100x100 image: {tiles_small.shape[0]} tiles, error={error_small:.2e}")
     assert error_small < 1e-5, f"Failed for small image"
     print("   PASSED: Small images handled correctly")
+
+    # Test 7: Additional weight property assertions
+    print("\n7. Testing additional weight properties...")
+    weights = create_cosine_ramp_weights(256, 64)
+
+    # Weights at tile center should be 1.0
+    center = 256 // 2
+    assert np.isclose(weights[center, center], 1.0, atol=1e-6), \
+        f"Center weight should be 1.0, got {weights[center, center]}"
+    print(f"   Weight at center ({center}, {center}): {weights[center, center]:.6f}")
+
+    # Weights at corners (overlap regions from both edges) should be < 0.5
+    corner_weight = weights[0, 0]
+    assert corner_weight < 0.5, f"Corner weight should be < 0.5, got {corner_weight}"
+    print(f"   Weight at corner (0, 0): {corner_weight:.6f}")
+
+    # Reconstruction error should be < 1e-5 for identity transform
+    np.random.seed(123)
+    test_img = np.random.rand(512, 512).astype(np.float32)
+    tiles, meta = extract_tiles(test_img, tile_size=256, overlap=64)
+    recon = reconstruct_from_tiles(tiles, meta, weights)
+    identity_error = np.abs(recon - test_img).max()
+    assert identity_error < 1e-5, f"Identity reconstruction error should be < 1e-5, got {identity_error}"
+    print(f"   Identity reconstruction error: {identity_error:.2e} (< 1e-5 required)")
+
+    print("   PASSED: Additional weight properties verified")
+
+    # Test 8: Save visualization
+    print("\n8. Saving blend weights visualization...")
+    import os
+    output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                              'notebooks', 'evaluations')
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, 'blend_weights_sample.png')
+    visualize_blend_weights(256, 64, output_path=output_path)
+    assert os.path.exists(output_path), f"Visualization file not created at {output_path}"
+    print(f"   Saved to: {output_path}")
+    print("   PASSED: Visualization saved successfully")
 
     print("\n" + "=" * 50)
     print("ALL TESTS PASSED!")
