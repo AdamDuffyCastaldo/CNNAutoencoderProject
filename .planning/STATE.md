@@ -54,16 +54,19 @@ Phase 7: Deployment         [----------] 0%
 | ENL ratio | 0.8-1.2 | ~0.85 | OK |
 | EPI | >0.85 | ~0.88 | OK |
 
-### Training Results
+### Training Results (16x compression only — other ratios not yet trained)
 
 | Model | Params | Best Loss | Best PSNR | Best SSIM | Status |
 |-------|--------|-----------|-----------|-----------|--------|
-| Baseline | 2.3M | 0.1813 | 20.47 dB | 0.646 | Complete |
-| ResNet-Lite v2 | 5.6M | 0.1410 | 21.20 dB | 0.726 | **Best Available** |
-| Residual v1 | 23.8M | - | 19.78 dB | - | Suboptimal (LR issue) |
-| Attention v1 | 24.0M | - | - | - | Quick test only |
+| Baseline (b=64) | 2.3M | 0.1813 | 20.47 dB | 0.646 | **Best Available** |
+| ResNet-Lite (b=32) | 5.6M | 0.1819 | 19.06 dB | 0.649 | Regressed (LR too high) |
+| Residual (b=32) | 6.0M | 0.1339 | 19.78 dB | 0.578 | Suboptimal (LR issue) |
+| Attention (b=48) | 13.5M | 0.2870 | 11.29 dB | 0.081 | Did not converge |
 
-**Best Checkpoint:** `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
+**Best Checkpoint:** `notebooks/checkpoints/baseline_c16_fast/best.pth`
+
+**Note:** Original ResNet-Lite v2 checkpoint (21.20 dB) was overwritten by overnight runs.
+All non-baseline models need retraining with proper hyperparameters (LR=1e-4, ReduceLROnPlateau).
 
 ### Codec Baselines (Random Noise Test @ 16x)
 
@@ -142,25 +145,28 @@ Phase 7: Deployment         [----------] 0%
 
 ### Last Session
 
-- **Date:** 2026-01-26
-- **Activity:** Phase 5 validation completion
+- **Date:** 2026-01-27
+- **Activity:** Phase 4 training review + naming convention standardization
 - **Outcome:**
-  - Fixed validation notebook tests (methodology issues)
-  - All 5 tests now pass
-  - Phase 5 complete with full inference pipeline validated
+  - Reviewed overnight training results: all ResNet runs regressed below baseline
+  - Root cause: LR too high (7e-3), base_channels too small (32), OneCycleLR overshoot
+  - Standardized naming convention across all 4 training notebooks
+  - Format: `{model}_c{latent}_b{base}_cr{ratio}x` + auto-timestamp
+  - All manual saves now use `trainer.log_dir` for consistency
+  - Built architecture x compression ratio status table: only baseline at 16x is usable
 
 ### Next Session
 
-- **Priority:** Phase 6 - Final Experiments
-- **Options:**
-  1. Proceed to Phase 6 (comparison study, real GeoTIFF testing)
-  2. Return to Phase 4 to complete model training (improve PSNR from 21 dB toward 25 dB target)
+- **Priority:** Multi-ratio training sweep for rate-distortion curves
+- **Resume file:** `.planning/phases/04-architecture/.continue-here.md`
 - **Context needed:**
-  - Full pipeline ready: sarcodec CLI, SARCompressor, GeoTIFF I/O
-  - Best checkpoint: `notebooks/checkpoints/resnet_lite_v2_c16/best.pth`
+  - Training matrix: 4 architectures x 5 ratios = 20 runs needed
+  - Only baseline@16x (20.47 dB) is usable — all others regressed
+  - Naming convention is now standardized across all notebooks
+  - User wants all compression ratios (4x, 8x, 16x, 32x, 64x) for R-D graphs
 - **Commands:**
-  - `/gsd:plan-phase 06` - Plan Phase 6
-  - `/gsd:progress` - See full project status
+  - `/gsd:resume-work` - Resume with full context
+  - Consider creating `scripts/train_sweep.py` for automated multi-config training
 
 ---
 
@@ -206,4 +212,4 @@ Phase 7: Deployment         [----------] 0%
 
 ---
 
-*State updated: 2026-01-26 (Phase 5 complete)*
+*State updated: 2026-01-27 (Phase 4 training review + naming standardization)*
