@@ -146,27 +146,26 @@ All non-baseline models need retraining with proper hyperparameters (LR=1e-4, Re
 ### Last Session
 
 - **Date:** 2026-01-27
-- **Activity:** Phase 4 training review + naming convention standardization
+- **Activity:** Sweep infrastructure + notebook fixes + training config optimization
 - **Outcome:**
-  - Reviewed overnight training results: all ResNet runs regressed below baseline
-  - Root cause: LR too high (7e-3), base_channels too small (32), OneCycleLR overshoot
-  - Standardized naming convention across all 4 training notebooks
-  - Format: `{model}_c{latent}_b{base}_cr{ratio}x` + auto-timestamp
-  - All manual saves now use `trainer.log_dir` for consistency
-  - Built architecture x compression ratio status table: only baseline at 16x is usable
+  - Created sweep notebooks: `sweep_baseline_ratios.ipynb`, `sweep_all_16x.ipynb`
+  - Fixed `compare_architectures.ipynb` (paths, timestamps, random sampling)
+  - Reviewed ResNet notebook — identified 6 hyperparameter issues
+  - Standardized all configs: TRAIN_SUBSET=0.10, EPOCHS=35, EARLY_STOPPING_PATIENCE=12
+  - Trainer tqdm switched to `tqdm.notebook` (still not rendering in VS Code)
 
 ### Next Session
 
-- **Priority:** Multi-ratio training sweep for rate-distortion curves
+- **Priority:** Execute training sweeps (overnight batches)
 - **Resume file:** `.planning/phases/04-architecture/.continue-here.md`
 - **Context needed:**
-  - Training matrix: 4 architectures x 5 ratios = 20 runs needed
-  - Only baseline@16x (20.47 dB) is usable — all others regressed
-  - Naming convention is now standardized across all notebooks
-  - User wants all compression ratios (4x, 8x, 16x, 32x, 64x) for R-D graphs
+  - Sweep notebooks and CLI script ready
+  - All configs use 10% data, 35 epochs, LR=1e-4, AdamW, ReduceLROnPlateau
+  - tqdm not rendering in VS Code — use TensorBoard or CLI script instead
 - **Commands:**
-  - `/gsd:resume-work` - Resume with full context
-  - Consider creating `scripts/train_sweep.py` for automated multi-config training
+  - `python scripts/train_sweep.py --sweep configs/sweep_baseline_ratios.yaml`
+  - `python scripts/train_sweep.py --sweep configs/sweep_all_16x.yaml`
+  - `tensorboard --logdir=runs`
 
 ---
 
