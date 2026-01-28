@@ -145,27 +145,28 @@ All non-baseline models need retraining with proper hyperparameters (LR=1e-4, Re
 
 ### Last Session
 
-- **Date:** 2026-01-27
-- **Activity:** Sweep infrastructure + notebook fixes + training config optimization
+- **Date:** 2026-01-28
+- **Activity:** Analyzed baseline ratios sweep + launched architecture comparison sweep
 - **Outcome:**
-  - Created sweep notebooks: `sweep_baseline_ratios.ipynb`, `sweep_all_16x.ipynb`
-  - Fixed `compare_architectures.ipynb` (paths, timestamps, random sampling)
-  - Reviewed ResNet notebook — identified 6 hyperparameter issues
-  - Standardized all configs: TRAIN_SUBSET=0.10, EPOCHS=35, EARLY_STOPPING_PATIENCE=12
-  - Trainer tqdm switched to `tqdm.notebook` (still not rendering in VS Code)
+  - Baseline ratios sweep COMPLETE: 4x=24.15dB, 8x=21.34dB, 12x=19.48dB (all undertrained, no early stop)
+  - Architecture sweep updated: baseline + resnet only, batch_size=16 (ResNet OOM at 36)
+  - Added checkpoint skip logic, combined R-D chart, datestamped save paths
+  - ResNet training running overnight (~22 min/epoch, 35 epochs)
 
 ### Next Session
 
-- **Priority:** Execute training sweeps (overnight batches)
+- **Priority:** Check ResNet results, analyze baseline vs ResNet at 16x
 - **Resume file:** `.planning/phases/04-architecture/.continue-here.md`
 - **Context needed:**
-  - Sweep notebooks and CLI script ready
-  - All configs use 10% data, 35 epochs, LR=1e-4, AdamW, ReduceLROnPlateau
-  - tqdm not rendering in VS Code — use TensorBoard or CLI script instead
-- **Commands:**
-  - `python scripts/train_sweep.py --sweep configs/sweep_baseline_ratios.yaml`
-  - `python scripts/train_sweep.py --sweep configs/sweep_all_16x.yaml`
-  - `tensorboard --logdir=runs`
+  - ResNet training should be complete (or check notebook for progress)
+  - Run cells 10+ in `notebooks/sweep_all_16x.ipynb` for charts and combined R-D curve
+  - Key question: does ResNet b=64 beat baseline at 16x with proper hyperparameters?
+- **Checkpoints:**
+  - Baseline 4x: `notebooks/checkpoints/baseline_c64_b64_cr4x_20260127_195355/best.pth`
+  - Baseline 8x: `notebooks/checkpoints/baseline_c32_b64_cr8x_20260127_205741/best.pth`
+  - Baseline 12x: `notebooks/checkpoints/baseline_c21_b64_cr12x_20260127_220001/best.pth`
+  - Baseline 16x: `notebooks/checkpoints/baseline_c16_b64_cr16x_*/best.pth`
+  - ResNet 16x: `notebooks/checkpoints/resnet_c16_b64_cr16x_*/best.pth` (pending)
 
 ---
 
