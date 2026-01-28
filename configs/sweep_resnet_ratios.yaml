@@ -1,0 +1,27 @@
+# Sweep configuration for ResNet at 4x and 8x compression ratios
+# Run with: python scripts/train_sweep.py --sweep configs/sweep_resnet_ratios.yaml
+#
+# Purpose: Complete ResNet rate-distortion curve for Phase 6 final experiments.
+# ResNet 16x already exists with 21.45 dB PSNR.
+
+defaults:
+  model: resnet
+  base_channels: 64
+  learning_rate: 1e-4
+  epochs: 35
+  early_stopping_patience: 15
+  batch_size: 16  # ResNet needs smaller batch on 8GB VRAM
+  scheduler: plateau
+  optimizer: adamw
+  use_amp: true
+  mse_weight: 0.5
+  ssim_weight: 0.5
+
+runs:
+  # 4x compression: latent_channels = 256*256 / (16*16*4) = 64
+  - latent_channels: 64
+    batch_size: 8  # ResNet with 64 latent channels is memory-heavy
+
+  # 8x compression: latent_channels = 256*256 / (16*16*8) = 32
+  - latent_channels: 32
+    batch_size: 12
