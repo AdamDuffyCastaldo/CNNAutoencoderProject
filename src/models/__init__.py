@@ -1,5 +1,6 @@
 from .encoder import SAREncoder
 from .decoder import SARDecoder
+from .resnet_autoencoder import ResNetAutoencoder, ResNetDecoder, ResNetEncoder
 from .autoencoder import SARAutoencoder
 from .blocks import ConvBlock, DeconvBlock, ResidualBlock
 from .residual_autoencoder import ResidualAutoencoder

@@ -9,9 +9,6 @@ This module implements the main training loop with:
 - Early stopping
 - Gradient clipping
 - Mixed Precision Training (AMP) for ~2x speedup
-
-References:
-    - Day 2, Section 2.7 of the learning guide
 """
 
 import torch
@@ -25,9 +22,9 @@ from datetime import datetime
 from typing import Dict, Optional, List, Tuple
 from collections import defaultdict
 import json
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 import logging
-
+import gc
 
 class Trainer:
     """
@@ -535,11 +532,14 @@ class Trainer:
                 self.writer.add_scalar(f'system/{key}', value, epoch)
 
             # Log reconstruction images (per CONTEXT.md: every epoch)
-            self.log_images(num_images=4)
+            if epoch % 5 == 0:
+                self.log_images(num_images=4)
 
             # Log weight histograms (per CONTEXT.md: every 10 epochs)
             if epoch % 10 == 0:
                 self._log_weight_histograms()
+
+            self.writer.flush()
 
             if self.scheduler_type != 'onecycle':
                 if not in_warmup and epoch >= self.warmup_epochs:
@@ -567,6 +567,9 @@ class Trainer:
                 'val_ssim': val_metrics.get('ssim', 0),
                 'learning_rate': current_lr,
             })
+
+            gc.collect()
+            torch.cuda.empty_cache()
 
             # Early abort if training completely diverged (all NaN)
             if train_metrics.get('loss', 0) == float('inf') and val_metrics.get('loss', 0) == float('inf'):

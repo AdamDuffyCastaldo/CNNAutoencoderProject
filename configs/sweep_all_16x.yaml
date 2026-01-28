@@ -1,0 +1,26 @@
+# Sweep: All 4 architectures at 16x compression
+# Purpose: Fair architecture comparison with correct hyperparameters
+#
+# Usage: python scripts/train_sweep.py --sweep configs/sweep_all_16x.yaml
+#
+# Previous runs failed due to: LR too high (7e-3), base_channels too small (32),
+# OneCycleLR overshoot. This config uses proven settings from baseline (20.47 dB).
+
+defaults:
+  latent_channels: 16
+  learning_rate: 0.0001
+  optimizer: adamw
+  scheduler: plateau
+  lr_patience: 10
+  lr_factor: 0.5
+  epochs: 35
+  early_stopping_patience: 12
+  batch_size: 36
+  mse_weight: 0.5
+  ssim_weight: 0.5
+
+runs:
+  - model: baseline
+    base_channels: 64
+  - model: resnet
+    base_channels: 64

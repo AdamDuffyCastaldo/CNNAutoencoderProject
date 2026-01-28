@@ -1,0 +1,26 @@
+# Sweep: Baseline model at 3 compression ratios
+# Purpose: Generate rate-distortion curve for baseline architecture
+#
+# Usage: python scripts/train_sweep.py --sweep configs/sweep_baseline_ratios.yaml
+#
+# Compression ratio = (256*256) / (16*16*latent_channels)
+#   LC=64 -> 4x,  LC=32 -> 8x,  LC=21 -> ~12x
+
+defaults:
+  model: baseline
+  base_channels: 64
+  learning_rate: 0.0001
+  optimizer: adamw
+  scheduler: plateau
+  lr_patience: 10
+  lr_factor: 0.5
+  epochs: 35
+  early_stopping_patience: 12
+  batch_size: 32
+  mse_weight: 0.5
+  ssim_weight: 0.5
+
+runs:
+  - latent_channels: 64   # 4x compression
+  - latent_channels: 32   # 8x compression
+  - latent_channels: 21   # ~12x compression

@@ -1,0 +1,29 @@
+{
+  "comparison_date": "2026-01-27T19:16:31.600628",
+  "compression_ratio": 16,
+  "validation_samples": 3481,
+  "best_model": "ResNet-Lite v2",
+  "phase_status": "partial_completion",
+  "results": {
+    "Baseline": {
+      "params": 2257809,
+      "val_loss": 0.18140331430172701,
+      "val_psnr": 20.47476897983376,
+      "val_ssim": 0.6461584879717696,
+      "enl_ratio": 1.0783245658234348,
+      "epi": 0.8604906082395074,
+      "status": "complete",
+      "notes": "Plain 4-layer encoder-decoder"
+    },
+    "ResNet-Lite v2": {
+      "params": 5648033,
+      "val_loss": 0.20180844577080612,
+      "val_psnr": 17.601199053843086,
+      "val_ssim": 0.6137617881144952,
+      "enl_ratio": 0.9040214696262437,
+      "epi": 0.8528200433935178,
+      "status": "complete",
+      "notes": "Post-activation residual blocks - BEST AVAILABLE"
+    }
+  }
+}

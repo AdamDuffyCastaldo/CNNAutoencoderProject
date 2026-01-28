@@ -37,6 +37,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+node_modules/
 
 # Build
 build/
