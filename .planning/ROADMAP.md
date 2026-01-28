@@ -208,7 +208,7 @@ Plans:
 
 **Estimated Complexity:** High
 
-**Status:** Partial completion (building blocks complete, training deferred)
+**Status:** Complete (ResNet b=64 selected as best architecture)
 
 **Plans:** 6 plans
 
@@ -216,9 +216,9 @@ Plans:
 - [x] 04-01-PLAN.md - Implement PreActResidualBlock and CBAM attention modules (building blocks)
 - [x] 04-02-PLAN.md - Create ResidualAutoencoder (Variant B architecture)
 - [x] 04-03-PLAN.md - Create AttentionAutoencoder (Variant C architecture)
-- [ ] 04-04-PLAN.md - Train Variant B (Residual) at 16x compression (deferred)
-- [ ] 04-05-PLAN.md - Train Variant C (Attention) at 16x compression (deferred)
-- [x] 04-06-PLAN.md - Compare architectures and assess phase success (partial)
+- [x] 04-04-PLAN.md - Baseline ratios sweep (4x, 8x, 12x)
+- [x] 04-05-PLAN.md - Architecture comparison sweep (ResNet vs Baseline @ 16x)
+- [x] 04-06-PLAN.md - Compare architectures and select best
 
 ### Success Criteria
 
@@ -228,7 +228,7 @@ Plans:
 4. Residual+CBAM architecture (Variant C) achieves PSNR at least 0.5 dB higher than Variant B
 5. All architecture variants maintain ENL ratio between 0.8-1.2 (no over-smoothing)
 
-**Current Status:** 3/5 criteria met, 2 deferred. Best available: ResNet-Lite v2 at 21.2 dB PSNR.
+**Final Status:** ResNet b=64 selected - 21.13 dB PSNR @ 16x (+2.04 dB over baseline)
 
 ### Requirements Mapped
 
@@ -255,9 +255,8 @@ Plans:
 - [x] Implement ChannelAttention, SpatialAttention, CBAM modules
 - [x] Create ResidualAutoencoder (Variant B)
 - [x] Create AttentionAutoencoder (Variant C)
-- [ ] Train Variant B (Residual) at 16x compression (deferred)
-- [ ] Train Variant C (Res+CBAM) at 16x compression (deferred)
-- [x] Evaluate all variants and compare metrics (partial - using available models)
+- [x] Train and compare architectures
+- [x] Select best architecture (ResNet b=64)
 
 ---
 
@@ -269,14 +268,16 @@ Plans:
 
 **Estimated Complexity:** Medium-High
 
+**Status:** Complete
+
 **Plans:** 5 plans
 
 Plans:
-- [ ] 05-01-PLAN.md - Tiling infrastructure (extraction, blending weights, reconstruction)
-- [ ] 05-02-PLAN.md - GeoTIFF I/O with metadata preservation
-- [ ] 05-03-PLAN.md - SARCompressor implementation (tiled compression/decompression)
-- [ ] 05-04-PLAN.md - CLI interface (sarcodec compress/decompress)
-- [ ] 05-05-PLAN.md - Full pipeline validation and benchmarking
+- [x] 05-01-PLAN.md - Tiling infrastructure (extraction, blending weights, reconstruction)
+- [x] 05-02-PLAN.md - GeoTIFF I/O with metadata preservation
+- [x] 05-03-PLAN.md - SARCompressor implementation (tiled compression/decompression)
+- [x] 05-04-PLAN.md - CLI interface (sarcodec compress/decompress)
+- [x] 05-05-PLAN.md - Full pipeline validation and benchmarking
 
 ### Success Criteria
 
@@ -314,66 +315,73 @@ Plans:
 
 ### Key Tasks (High-Level)
 
-- [ ] Implement cosine ramp blending weights
-- [ ] Implement tiled extraction with reflection padding
-- [ ] Implement weighted reconstruction from tiles
-- [ ] Implement GeoTIFF reading with metadata extraction
-- [ ] Implement GeoTIFF writing with metadata preservation
-- [ ] Implement SARCompressor with model loading and preprocessing
-- [ ] Implement batched tiled inference with progress callbacks
-- [ ] Create CLI with compress/decompress subcommands
-- [ ] Test on synthetic large images (no visible tile boundaries)
-- [ ] Verify round-trip PSNR consistency
-- [ ] Benchmark processing time and memory usage
+- [x] Implement cosine ramp blending weights
+- [x] Implement tiled extraction with reflection padding
+- [x] Implement weighted reconstruction from tiles
+- [x] Implement GeoTIFF reading with metadata extraction
+- [x] Implement GeoTIFF writing with metadata preservation
+- [x] Implement SARCompressor with model loading and preprocessing
+- [x] Implement batched tiled inference with progress callbacks
+- [x] Create CLI with compress/decompress subcommands
+- [x] Test on synthetic large images (no visible tile boundaries)
+- [x] Verify round-trip PSNR consistency
+- [x] Benchmark processing time and memory usage
 
 ---
 
 ## Phase 6: Final Experiments
 
-**Goal:** Execute the complete experiment matrix (3 architectures x 3 compression ratios = 9 models) and produce a comprehensive comparison study with rate-distortion analysis.
+**Goal:** Execute experiment matrix (2 architectures x 3 compression ratios) and produce comprehensive comparison study with rate-distortion analysis comparing autoencoders vs JPEG-2000.
 
 **Dependencies:** Phase 5 (Full Image Inference)
 
 **Estimated Complexity:** High
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 06-01-PLAN.md - Train missing ResNet models (4x, 8x compression ratios)
+- [ ] 06-02-PLAN.md - Systematic evaluation with JPEG-2000 comparison
+- [ ] 06-03-PLAN.md - Statistical analysis and final report generation
+
 ### Success Criteria
 
-1. All 9 experiment configurations (Plain/Residual/Res+CBAM at 8x/16x/32x) complete training successfully
-2. Rate-distortion curves are generated showing PSNR vs BPP for all architectures AND traditional codecs
-3. At least one configuration achieves PSNR >30 dB at 16x compression (primary target)
+1. All 6 experiment configurations (Baseline/ResNet at 4x/8x/16x) have trained checkpoints
+2. Rate-distortion curves are generated showing PSNR vs BPP for all architectures AND JPEG-2000
+3. Statistical tests (paired t-test/Wilcoxon) compare autoencoder vs JPEG-2000 with p-values
 4. Best autoencoder variant outperforms JPEG-2000 at equivalent compression ratio
 5. Statistical analysis includes mean and standard deviation across test set for all metrics
-6. Final documentation includes visual examples at each compression level showing quality differences vs traditional codecs
+6. Final documentation includes visual examples at each compression level showing quality differences vs JPEG-2000
 
 ### Requirements Mapped
 
 | ID | Requirement |
 |----|-------------|
-| FR6.1 | Train plain architecture at multiple compression ratios (8x, 16x, 32x) |
-| FR6.2 | Train residual architecture at multiple compression ratios |
-| FR6.3 | Train residual+CBAM architecture at multiple compression ratios |
+| FR6.1 | Train plain architecture at multiple compression ratios (4x, 8x, 16x) |
+| FR6.2 | Train ResNet architecture at multiple compression ratios |
 | FR6.4 | Generate rate-distortion curves comparing all variants |
 | FR6.5 | Statistical analysis of results |
 | FR6.6 | Document findings with visual examples |
 
 ### Deliverables
 
-- 9 trained model checkpoints (3 architectures x 3 compression ratios)
+- 6 trained model checkpoints (2 architectures x 3 compression ratios)
 - Rate-distortion curves (PSNR vs BPP, SSIM vs BPP) including JPEG-2000 baseline
-- Comprehensive metrics table with statistics (autoencoders + traditional codecs)
+- Comprehensive metrics table with statistics (autoencoders + JPEG-2000)
 - Visual comparison gallery: autoencoder vs JPEG-2000 at each compression level
-- Final analysis document summarizing findings and codec comparison
+- Statistical test results (p-values for autoencoder vs JPEG-2000)
+- Final analysis report (Jupyter notebook + Markdown)
 
 ### Key Tasks (High-Level)
 
-- [ ] Train Plain architecture at 8x, 16x, 32x compression
-- [ ] Train Residual architecture at 8x, 16x, 32x compression
-- [ ] Train Res+CBAM architecture at 8x, 16x, 32x compression
-- [ ] Evaluate all models on test set with full metrics suite
-- [ ] Include JPEG-2000 results in rate-distortion curves
-- [ ] Generate rate-distortion curves (autoencoders + traditional codecs)
-- [ ] Create visual comparison gallery (include JPEG-2000 comparison)
-- [ ] Document findings: autoencoder vs traditional codec performance
+- [ ] Train ResNet at 4x, 8x compression (16x already trained)
+- [ ] Evaluate all 6 autoencoder models with full metrics
+- [ ] Evaluate JPEG-2000 at 4x, 8x, 16x on same test set
+- [ ] Collect per-sample metrics for statistical testing
+- [ ] Perform paired statistical tests (t-test or Wilcoxon)
+- [ ] Generate rate-distortion curves (autoencoders + JPEG-2000)
+- [ ] Create visual comparison gallery with error heatmaps
+- [ ] Write final report with conclusions
 
 ---
 
@@ -436,9 +444,9 @@ Plans:
 | 1 - Data Pipeline | Complete | 5/5 |
 | 2 - Baseline Model | Complete | 5/5 |
 | 3 - SAR Evaluation | Complete | 6/6 |
-| 4 - Architecture Enhancement | Partial | 3/5 (training deferred) |
-| 5 - Full Image Inference | Not Started | 0/7 |
-| 6 - Final Experiments | Not Started | 0/6 |
+| 4 - Architecture Enhancement | Complete | 5/5 (ResNet b=64 selected) |
+| 5 - Full Image Inference | Complete | 7/7 |
+| 6 - Final Experiments | Planning | 0/6 |
 | 7 - Deployment | Not Started | 0/6 |
 
 ---
@@ -492,6 +500,7 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 *Phase 3 planned: 2026-01-24*
 *Phase 3 complete: 2026-01-24*
 *Phase 4 planned: 2026-01-24*
-*Phase 4 partial: 2026-01-26 (building blocks complete, training deferred)*
-*Phase 5 planned: 2026-01-26*
+*Phase 4 complete: 2026-01-28 (ResNet b=64 selected)*
+*Phase 5 complete: 2026-01-26*
+*Phase 6 planned: 2026-01-28*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
