@@ -490,6 +490,232 @@ def test_bitrate():
     print("=" * 60)
 
 
+def validate_on_real_latent():
+    """
+    Validate entropy calculation on real autoencoder latent.
+
+    This function:
+    1. Loads a trained ResNet 16x model
+    2. Extracts latent representations from test samples
+    3. Computes entropy-based BPP
+    4. Compares to geometric BPP
+    5. Measures quantization degradation
+
+    The validation confirms:
+    - Entropy-based BPP is lower than geometric BPP (2.0 for 16x)
+    - Quantization doesn't severely degrade reconstruction quality
+    """
+    import torch
+    import sys
+    from pathlib import Path
+
+    # Add project root to path for imports
+    project_root = Path(__file__).parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
+    from src.models.resnet_autoencoder import ResNetAutoencoder
+    from src.evaluation.metrics import SARMetrics
+
+    print("=" * 60)
+    print("Validating Entropy Calculation on Real Latent")
+    print("=" * 60)
+
+    # Configuration
+    checkpoint_path = project_root / 'notebooks/checkpoints/resnet_c16_b64_cr16x_20260128_003926/best.pth'
+    metadata_path = project_root / 'data/patches/metadata.npy'
+    n_samples = 10  # Number of test samples to evaluate
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    print(f"\nDevice: {device}")
+    print(f"Checkpoint: {checkpoint_path}")
+
+    # Load checkpoint
+    if not checkpoint_path.exists():
+        print(f"ERROR: Checkpoint not found at {checkpoint_path}")
+        print("Please ensure the ResNet 16x model has been trained.")
+        return
+
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    config = checkpoint['config']
+    print(f"Model config: {config.get('model_type', 'unknown')}, "
+          f"latent_channels={config.get('latent_channels', 'N/A')}, "
+          f"base_channels={config.get('base_channels', 'N/A')}")
+
+    # Create and load model
+    model = ResNetAutoencoder(
+        in_channels=1,
+        latent_channels=config.get('latent_channels', 16),
+        base_channels=config.get('base_channels', 64)
+    )
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model = model.to(device)
+    model.eval()
+
+    print(f"Model loaded: {model.count_parameters()['total']:,} parameters")
+
+    # Load test samples from dataset
+    if not metadata_path.exists():
+        print(f"ERROR: Metadata not found at {metadata_path}")
+        return
+
+    metadata = np.load(metadata_path, allow_pickle=True).item()
+    file_index = metadata['file_index']
+
+    # Get samples from first file
+    first_file_path, first_file_count = file_index[0]
+    print(f"\nLoading samples from: {Path(first_file_path).name}")
+
+    patches = np.load(first_file_path, mmap_mode='r')
+    # Use fixed indices for reproducibility
+    np.random.seed(42)
+    sample_indices = np.random.choice(min(first_file_count, 1000), size=n_samples, replace=False)
+    test_patches = patches[sample_indices].copy()
+
+    print(f"Loaded {n_samples} test patches, shape: {test_patches.shape}")
+
+    # Process samples
+    all_latents = []
+    psnr_original = []
+    psnr_quantized = []
+    ssim_original = []
+    ssim_quantized = []
+
+    print(f"\n--- Processing {n_samples} samples ---")
+
+    with torch.no_grad():
+        for i, patch in enumerate(test_patches):
+            # Add batch and channel dims: (H, W) -> (1, 1, H, W)
+            x = torch.from_numpy(patch).unsqueeze(0).unsqueeze(0).to(device)
+
+            # Encode
+            latent = model.encode(x)  # (1, C, H, W)
+            all_latents.append(latent.cpu().numpy())
+
+            # Decode original latent
+            recon_original = model.decode(latent)
+
+            # Quantize/dequantize latent
+            latent_np = latent.cpu().numpy()
+            quantized, ranges = quantize_latent(latent_np, n_bins=256)
+            dequantized = dequantize_latent(quantized, ranges, n_bins=256)
+
+            # Decode quantized latent
+            dequantized_tensor = torch.from_numpy(dequantized).to(device)
+            recon_quantized = model.decode(dequantized_tensor)
+
+            # Compute metrics
+            x_np = patch
+            recon_orig_np = recon_original.cpu().numpy().squeeze()
+            recon_quant_np = recon_quantized.cpu().numpy().squeeze()
+
+            psnr_orig = SARMetrics.psnr(x_np, recon_orig_np)
+            psnr_quant = SARMetrics.psnr(x_np, recon_quant_np)
+            ssim_orig = SARMetrics.ssim(x_np, recon_orig_np)
+            ssim_quant = SARMetrics.ssim(x_np, recon_quant_np)
+
+            psnr_original.append(psnr_orig)
+            psnr_quantized.append(psnr_quant)
+            ssim_original.append(ssim_orig)
+            ssim_quantized.append(ssim_quant)
+
+            if i < 3:  # Print details for first 3
+                print(f"  Sample {i}: PSNR orig={psnr_orig:.2f} dB, quant={psnr_quant:.2f} dB, "
+                      f"diff={psnr_orig - psnr_quant:.3f} dB")
+
+    # Aggregate latents
+    all_latents_np = np.concatenate(all_latents, axis=0)  # (N, C, H, W)
+    print(f"\nAggregated latents shape: {all_latents_np.shape}")
+
+    # Compute entropy-based BPP
+    result = estimate_latent_entropy(all_latents_np, n_bins=256, return_per_channel=True)
+
+    # Geometric BPP (assuming float32 storage)
+    latent_shape = all_latents_np.shape
+    C = latent_shape[1]
+    geometric_bpp = (16 * 16 * C * 32) / (256 * 256)
+
+    # 8-bit geometric BPP (if we stored quantized without entropy coding)
+    geometric_8bit_bpp = (16 * 16 * C * 8) / (256 * 256)
+
+    print(f"\n--- BPP Comparison ---")
+    print(f"Geometric BPP (float32 latent): {geometric_bpp:.4f}")
+    print(f"Geometric BPP (8-bit latent):   {geometric_8bit_bpp:.4f}")
+    print(f"Entropy-based BPP (8-bit):      {result['bpp']:.4f}")
+    print(f"Reduction from float32:         {(1 - result['bpp'] / geometric_bpp) * 100:.1f}%")
+    print(f"Reduction from 8-bit:           {(1 - result['bpp'] / geometric_8bit_bpp) * 100:.1f}%")
+
+    # Per-channel entropy
+    print(f"\nPer-channel entropy (bits/symbol):")
+    for c, h in enumerate(result['channel_entropy'][:4]):  # First 4 channels
+        print(f"  Channel {c}: {h:.4f} bits/symbol")
+    if C > 4:
+        print(f"  ... ({C - 4} more channels)")
+
+    # Quantization degradation
+    print(f"\n--- Quantization Degradation ---")
+    mean_psnr_orig = np.mean(psnr_original)
+    mean_psnr_quant = np.mean(psnr_quantized)
+    mean_ssim_orig = np.mean(ssim_original)
+    mean_ssim_quant = np.mean(ssim_quantized)
+
+    psnr_degradation = mean_psnr_orig - mean_psnr_quant
+    ssim_degradation = mean_ssim_orig - mean_ssim_quant
+
+    print(f"Original reconstruction:")
+    print(f"  PSNR: {mean_psnr_orig:.2f} +/- {np.std(psnr_original):.2f} dB")
+    print(f"  SSIM: {mean_ssim_orig:.4f} +/- {np.std(ssim_original):.4f}")
+
+    print(f"Quantized reconstruction:")
+    print(f"  PSNR: {mean_psnr_quant:.2f} +/- {np.std(psnr_quantized):.2f} dB")
+    print(f"  SSIM: {mean_ssim_quant:.4f} +/- {np.std(ssim_quantized):.4f}")
+
+    print(f"Degradation:")
+    print(f"  PSNR: -{psnr_degradation:.3f} dB")
+    print(f"  SSIM: -{ssim_degradation:.6f}")
+
+    # Validation checks
+    print(f"\n--- Validation Results ---")
+
+    # Check 1: Entropy BPP < geometric BPP
+    if result['bpp'] < geometric_bpp:
+        print(f"[PASS] Entropy BPP ({result['bpp']:.4f}) < Geometric BPP ({geometric_bpp:.4f})")
+    else:
+        print(f"[WARN] Entropy BPP ({result['bpp']:.4f}) >= Geometric BPP ({geometric_bpp:.4f})")
+
+    # Check 2: Quantization degradation is small
+    if psnr_degradation < 1.0:
+        print(f"[PASS] PSNR degradation ({psnr_degradation:.3f} dB) < 1.0 dB")
+    elif psnr_degradation < 2.0:
+        print(f"[WARN] PSNR degradation ({psnr_degradation:.3f} dB) is moderate (1-2 dB)")
+    else:
+        print(f"[WARN] PSNR degradation ({psnr_degradation:.3f} dB) is significant (>2 dB)")
+
+    # Check 3: Entropy values are reasonable
+    mean_entropy = np.mean(result['channel_entropy'])
+    if 4.0 < mean_entropy < 8.0:
+        print(f"[PASS] Mean channel entropy ({mean_entropy:.2f} bits) is reasonable")
+    else:
+        print(f"[WARN] Mean channel entropy ({mean_entropy:.2f} bits) is unusual")
+
+    print("\n" + "=" * 60)
+    print("Validation complete!")
+    print("=" * 60)
+
+    # Return summary for programmatic use
+    return {
+        'geometric_bpp': geometric_bpp,
+        'entropy_bpp': result['bpp'],
+        'mean_psnr_original': mean_psnr_orig,
+        'mean_psnr_quantized': mean_psnr_quant,
+        'psnr_degradation': psnr_degradation,
+        'mean_ssim_original': mean_ssim_orig,
+        'mean_ssim_quantized': mean_ssim_quant,
+        'ssim_degradation': ssim_degradation,
+        'channel_entropies': result['channel_entropy'],
+    }
+
+
 # Module exports
 __all__ = [
     'quantize_latent',
@@ -498,6 +724,7 @@ __all__ = [
     'estimate_latent_entropy',
     'compute_latent_bpp',
     'test_bitrate',
+    'validate_on_real_latent',
 ]
 
 
