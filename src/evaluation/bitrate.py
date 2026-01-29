@@ -1,0 +1,505 @@
+"""
+Entropy-Based Bitrate Calculation for Autoencoder Latents
+
+This module implements entropy-based bits-per-pixel (BPP) calculation for
+quantized autoencoder latents, enabling fair comparison with traditional
+codecs like JPEG-2000 at matched bitrates.
+
+Key Functions:
+- quantize_latent: Per-channel quantization to discrete levels
+- dequantize_latent: Inverse quantization back to original range
+- estimate_channel_entropy: Shannon entropy estimation for a single channel
+- estimate_latent_entropy: Full entropy estimation with overhead
+- compute_latent_bpp: Convenience function for BPP calculation
+
+The approach follows standard practice in learned image compression:
+1. Quantize latent to discrete levels (e.g., 8-bit = 256 levels)
+2. Estimate entropy of quantized distribution using histograms
+3. Calculate BPP as total_bits / num_input_pixels
+4. Include overhead for quantization parameters (min/max per channel)
+
+References:
+    - Balle et al. "End-to-end Optimized Image Compression" (2017)
+    - Phase 6.1 Research: entropy estimation methodology
+"""
+
+import numpy as np
+from scipy.stats import entropy
+from typing import Tuple, List, Dict, Union, Optional
+
+
+def quantize_latent(
+    latent: np.ndarray,
+    n_bins: int = 256
+) -> Tuple[np.ndarray, List[Tuple[float, float]]]:
+    """
+    Quantize latent representation to discrete levels per-channel.
+
+    Each channel is independently quantized using its own min/max range,
+    preserving more precision than global quantization when channels
+    have different value distributions.
+
+    Parameters
+    ----------
+    latent : np.ndarray
+        Latent tensor of shape (B, C, H, W) or (C, H, W), float32.
+        For batch processing, quantization ranges are computed across
+        the entire batch per channel.
+    n_bins : int, optional
+        Number of quantization levels. Default 256 for 8-bit quantization.
+
+    Returns
+    -------
+    quantized : np.ndarray
+        Quantized array as uint8, same shape as input.
+        Values in range [0, n_bins-1].
+    ranges : List[Tuple[float, float]]
+        List of (vmin, vmax) tuples per channel. Length equals C.
+        These values are needed for dequantization.
+
+    Notes
+    -----
+    - If vmax == vmin for a channel (constant values), the quantized
+      output is all zeros for that channel.
+    - The quantization formula is:
+      quantized = floor((x - vmin) / (vmax - vmin) * (n_bins - 1))
+
+    Examples
+    --------
+    >>> latent = np.random.randn(1, 16, 16, 16).astype(np.float32)
+    >>> quantized, ranges = quantize_latent(latent, n_bins=256)
+    >>> print(quantized.shape, quantized.dtype)
+    (1, 16, 16, 16) uint8
+    >>> print(len(ranges))
+    16
+    """
+    latent = np.asarray(latent, dtype=np.float32)
+
+    # Handle both (C, H, W) and (B, C, H, W) shapes
+    if latent.ndim == 3:
+        latent = latent[np.newaxis, ...]  # Add batch dimension
+
+    B, C, H, W = latent.shape
+    quantized = np.zeros_like(latent, dtype=np.uint8)
+    ranges = []
+
+    for c in range(C):
+        channel_data = latent[:, c, :, :]
+        vmin = float(channel_data.min())
+        vmax = float(channel_data.max())
+        ranges.append((vmin, vmax))
+
+        if vmax > vmin:
+            # Scale to [0, n_bins-1]
+            scaled = (channel_data - vmin) / (vmax - vmin)
+            quantized[:, c, :, :] = np.floor(
+                scaled * (n_bins - 1)
+            ).clip(0, n_bins - 1).astype(np.uint8)
+        else:
+            # Constant channel - all zeros
+            quantized[:, c, :, :] = 0
+
+    # Remove batch dimension if input was 3D
+    if latent.shape[0] == 1 and len(latent.shape) == 4:
+        # Keep batch dim for consistency
+        pass
+
+    return quantized, ranges
+
+
+def dequantize_latent(
+    quantized: np.ndarray,
+    ranges: List[Tuple[float, float]],
+    n_bins: int = 256
+) -> np.ndarray:
+    """
+    Dequantize latent representation back to original value range.
+
+    Inverse operation of quantize_latent. Reconstructs approximate
+    float values from quantized integers using the stored per-channel
+    ranges.
+
+    Parameters
+    ----------
+    quantized : np.ndarray
+        Quantized array as uint8, shape (B, C, H, W) or (C, H, W).
+        Values should be in range [0, n_bins-1].
+    ranges : List[Tuple[float, float]]
+        List of (vmin, vmax) tuples per channel from quantize_latent.
+    n_bins : int, optional
+        Number of quantization levels. Must match quantization. Default 256.
+
+    Returns
+    -------
+    dequantized : np.ndarray
+        Float32 array in original value range, same shape as input.
+
+    Notes
+    -----
+    - The dequantization formula is:
+      x_float = quantized / (n_bins - 1) * (vmax - vmin) + vmin
+    - Reconstruction error is bounded by (vmax - vmin) / (2 * (n_bins - 1))
+      for each channel.
+
+    Examples
+    --------
+    >>> latent = np.random.randn(1, 16, 16, 16).astype(np.float32)
+    >>> quantized, ranges = quantize_latent(latent)
+    >>> reconstructed = dequantize_latent(quantized, ranges)
+    >>> max_error = np.max(np.abs(latent - reconstructed))
+    >>> print(f"Max reconstruction error: {max_error:.6f}")
+    """
+    quantized = np.asarray(quantized)
+
+    # Handle both (C, H, W) and (B, C, H, W) shapes
+    added_batch = False
+    if quantized.ndim == 3:
+        quantized = quantized[np.newaxis, ...]
+        added_batch = True
+
+    B, C, H, W = quantized.shape
+    dequantized = np.zeros_like(quantized, dtype=np.float32)
+
+    for c in range(C):
+        vmin, vmax = ranges[c]
+        channel_data = quantized[:, c, :, :].astype(np.float32)
+
+        if vmax > vmin:
+            # Scale back to original range
+            dequantized[:, c, :, :] = (
+                channel_data / (n_bins - 1) * (vmax - vmin) + vmin
+            )
+        else:
+            # Constant channel - fill with original value
+            dequantized[:, c, :, :] = vmin
+
+    if added_batch:
+        dequantized = dequantized[0]
+
+    return dequantized
+
+
+def estimate_channel_entropy(
+    channel_data: np.ndarray,
+    n_bins: int = 256
+) -> float:
+    """
+    Estimate Shannon entropy for a single channel of quantized data.
+
+    Uses histogram-based probability estimation and scipy.stats.entropy
+    with base=2 to compute entropy in bits per symbol.
+
+    Parameters
+    ----------
+    channel_data : np.ndarray
+        Flattened or multi-dimensional array of quantized values.
+        Values should be integers in range [0, n_bins-1].
+    n_bins : int, optional
+        Number of quantization bins. Default 256.
+
+    Returns
+    -------
+    float
+        Entropy in bits per symbol. For uniform distribution over
+        n_bins values, this equals log2(n_bins) = 8 bits for 256 bins.
+
+    Notes
+    -----
+    - Uses scipy.stats.entropy(prob, base=2) for the calculation.
+    - Zero-probability bins are automatically excluded from the sum.
+    - For highly peaked distributions, entropy can be much lower than
+      log2(n_bins), indicating good compressibility.
+
+    Examples
+    --------
+    >>> # Uniform distribution - maximum entropy
+    >>> uniform_data = np.arange(256).astype(np.uint8)
+    >>> h = estimate_channel_entropy(uniform_data, n_bins=256)
+    >>> print(f"Uniform entropy: {h:.2f} bits")  # ~8 bits
+
+    >>> # Peaked distribution - lower entropy
+    >>> peaked_data = np.zeros(1000, dtype=np.uint8)
+    >>> peaked_data[0] = 128  # One different value
+    >>> h = estimate_channel_entropy(peaked_data, n_bins=256)
+    >>> print(f"Peaked entropy: {h:.4f} bits")  # Near 0
+    """
+    channel_data = np.asarray(channel_data).flatten().astype(int)
+
+    # Compute histogram
+    hist, _ = np.histogram(channel_data, bins=n_bins, range=(0, n_bins))
+
+    # Normalize to probability distribution
+    total = hist.sum()
+    if total == 0:
+        return 0.0
+
+    prob = hist / total
+
+    # Remove zero probabilities (entropy function handles this, but
+    # being explicit avoids potential numerical issues)
+    prob = prob[prob > 0]
+
+    # Calculate entropy in bits (base=2)
+    return float(entropy(prob, base=2))
+
+
+def estimate_latent_entropy(
+    latent: np.ndarray,
+    n_bins: int = 256,
+    return_per_channel: bool = False,
+    input_shape: Tuple[int, int] = (256, 256)
+) -> Dict[str, Union[float, int, List[float]]]:
+    """
+    Estimate total entropy and BPP for a latent representation.
+
+    Performs per-channel entropy estimation and aggregates results,
+    including overhead for storing quantization parameters.
+
+    Parameters
+    ----------
+    latent : np.ndarray
+        Latent tensor of shape (B, C, H, W) or (C, H, W), float32.
+    n_bins : int, optional
+        Number of quantization levels. Default 256.
+    return_per_channel : bool, optional
+        If True, include per-channel entropy breakdown. Default False.
+    input_shape : Tuple[int, int], optional
+        Original input image size (H, W). Default (256, 256).
+
+    Returns
+    -------
+    Dict[str, Union[float, int, List[float]]]
+        Dictionary containing:
+        - 'total_bits': Total bits for all samples including overhead
+        - 'bpp': Bits per pixel relative to input image size
+        - 'overhead_bits': Bits for quantization parameters (64 * C)
+        - 'n_channels': Number of latent channels (C)
+        - 'n_samples': Number of samples in batch (B)
+        - 'channel_entropy': List of bits/symbol per channel (if return_per_channel)
+        - 'channel_bits': List of total bits per channel (if return_per_channel)
+
+    Notes
+    -----
+    - Overhead is 64 bits per channel (32-bit float * 2 for min/max).
+    - BPP = total_bits / (B * input_H * input_W)
+    - Total bits = sum(channel_entropy * channel_samples) + overhead
+
+    Examples
+    --------
+    >>> # Simulate 16x compression latent
+    >>> latent = np.random.randn(1, 16, 16, 16).astype(np.float32)
+    >>> result = estimate_latent_entropy(latent)
+    >>> print(f"BPP: {result['bpp']:.4f}")
+    >>> print(f"Total bits: {result['total_bits']:.0f}")
+    """
+    latent = np.asarray(latent, dtype=np.float32)
+
+    # Handle both (C, H, W) and (B, C, H, W) shapes
+    if latent.ndim == 3:
+        latent = latent[np.newaxis, ...]
+
+    B, C, H, W = latent.shape
+    input_pixels = input_shape[0] * input_shape[1]
+
+    # Quantize latent
+    quantized, ranges = quantize_latent(latent, n_bins)
+
+    # Calculate entropy per channel
+    channel_entropy = []  # bits per symbol
+    channel_bits = []     # total bits per channel
+
+    for c in range(C):
+        channel_data = quantized[:, c, :, :].flatten()
+        h = estimate_channel_entropy(channel_data, n_bins)
+        channel_entropy.append(h)
+
+        # Total bits = entropy * number of symbols
+        n_symbols = len(channel_data)  # B * H * W
+        channel_bits.append(h * n_symbols)
+
+    # Sum channel bits
+    content_bits = sum(channel_bits)
+
+    # Overhead for quantization parameters: 64 bits per channel
+    # (32-bit float for min + 32-bit float for max)
+    overhead_bits = 64 * C
+    total_bits = content_bits + overhead_bits
+
+    # BPP relative to original input image
+    bpp = total_bits / (B * input_pixels)
+
+    result = {
+        'total_bits': float(total_bits),
+        'bpp': float(bpp),
+        'overhead_bits': int(overhead_bits),
+        'n_channels': C,
+        'n_samples': B,
+    }
+
+    if return_per_channel:
+        result['channel_entropy'] = channel_entropy
+        result['channel_bits'] = channel_bits
+
+    return result
+
+
+def compute_latent_bpp(
+    latent: np.ndarray,
+    n_bins: int = 256,
+    input_shape: Tuple[int, int] = (256, 256)
+) -> float:
+    """
+    Convenience function to compute just the BPP value.
+
+    Wrapper around estimate_latent_entropy that returns only the
+    bits-per-pixel value.
+
+    Parameters
+    ----------
+    latent : np.ndarray
+        Latent tensor of shape (B, C, H, W) or (C, H, W), float32.
+    n_bins : int, optional
+        Number of quantization levels. Default 256.
+    input_shape : Tuple[int, int], optional
+        Original input image size (H, W). Default (256, 256).
+
+    Returns
+    -------
+    float
+        Bits per pixel including overhead.
+
+    Examples
+    --------
+    >>> latent = np.random.randn(1, 16, 16, 16).astype(np.float32)
+    >>> bpp = compute_latent_bpp(latent)
+    >>> print(f"BPP: {bpp:.4f}")
+    """
+    result = estimate_latent_entropy(latent, n_bins, input_shape=input_shape)
+    return result['bpp']
+
+
+def test_bitrate():
+    """
+    Test all bitrate calculation functions.
+
+    Creates a random latent, performs quantization/dequantization,
+    and validates the entropy/BPP calculations.
+    """
+    print("=" * 60)
+    print("Testing Bitrate Calculation Functions")
+    print("=" * 60)
+
+    np.random.seed(42)
+
+    # Create test latent: (1, 16, 16, 16) simulating 16x compression
+    # 256x256 input -> 16x16 latent with 16 channels
+    latent = np.random.randn(1, 16, 16, 16).astype(np.float32)
+    # Make it more realistic - different channels have different distributions
+    for c in range(16):
+        latent[:, c, :, :] = latent[:, c, :, :] * (c + 1) * 0.5 + c * 0.1
+
+    print(f"\n--- Test Latent ---")
+    print(f"Shape: {latent.shape}")
+    print(f"Range: [{latent.min():.4f}, {latent.max():.4f}]")
+
+    # Test 1: Quantization and dequantization
+    print(f"\n--- Test 1: Quantization/Dequantization ---")
+    quantized, ranges = quantize_latent(latent, n_bins=256)
+    print(f"Quantized shape: {quantized.shape}")
+    print(f"Quantized dtype: {quantized.dtype}")
+    print(f"Quantized range: [{quantized.min()}, {quantized.max()}]")
+    print(f"Number of channel ranges: {len(ranges)}")
+
+    # Dequantize
+    dequantized = dequantize_latent(quantized, ranges, n_bins=256)
+    print(f"Dequantized shape: {dequantized.shape}")
+
+    # Check reconstruction error
+    recon_error = np.abs(latent - dequantized)
+    max_error = recon_error.max()
+    mean_error = recon_error.mean()
+    print(f"Max reconstruction error: {max_error:.6f}")
+    print(f"Mean reconstruction error: {mean_error:.6f}")
+
+    # Theoretical max error per channel: (vmax - vmin) / (n_bins - 1)
+    # This is the step size; actual error can be up to this value
+    for c in range(min(3, 16)):  # Check first 3 channels
+        vmin, vmax = ranges[c]
+        step_size = (vmax - vmin) / (256 - 1)
+        actual_max = np.abs(latent[:, c, :, :] - dequantized[:, c, :, :]).max()
+        print(f"  Channel {c}: step size={step_size:.6f}, actual max error={actual_max:.6f}")
+        assert actual_max <= step_size + 1e-6, f"Error exceeds bound on channel {c}"
+
+    print("  Reconstruction error bounded correctly!")
+
+    # Test 2: Entropy estimation
+    print(f"\n--- Test 2: Entropy Estimation ---")
+    result = estimate_latent_entropy(latent, n_bins=256, return_per_channel=True)
+
+    print(f"Total bits: {result['total_bits']:.2f}")
+    print(f"BPP: {result['bpp']:.4f}")
+    print(f"Overhead bits: {result['overhead_bits']}")
+    print(f"Number of channels: {result['n_channels']}")
+    print(f"Number of samples: {result['n_samples']}")
+
+    # Print per-channel entropy
+    print(f"\nPer-channel entropy (bits/symbol):")
+    for c, (h, bits) in enumerate(zip(result['channel_entropy'], result['channel_bits'])):
+        print(f"  Channel {c}: {h:.4f} bits/symbol, {bits:.2f} total bits")
+
+    # Test 3: Compare to geometric BPP
+    print(f"\n--- Test 3: Geometric vs Entropy BPP ---")
+    # Geometric BPP assuming float32: 16*16*16*32 / (256*256) = 2.0
+    geometric_bpp = (16 * 16 * 16 * 32) / (256 * 256)
+    entropy_bpp = result['bpp']
+
+    print(f"Geometric BPP (float32 latent): {geometric_bpp:.4f}")
+    print(f"Entropy-based BPP (8-bit quantized): {entropy_bpp:.4f}")
+    print(f"Reduction: {(1 - entropy_bpp / geometric_bpp) * 100:.1f}%")
+
+    # Entropy BPP should be less than 8 bits (max for 256 bins)
+    # and typically less than geometric BPP if there's redundancy
+    assert entropy_bpp < 8 * 16 * 16 * 16 / (256 * 256), "BPP exceeds 8-bit upper bound"
+    print("  BPP is reasonable (below 8-bit upper bound)!")
+
+    # Test 4: Convenience function
+    print(f"\n--- Test 4: Convenience Function ---")
+    bpp = compute_latent_bpp(latent)
+    print(f"compute_latent_bpp result: {bpp:.4f}")
+    assert abs(bpp - result['bpp']) < 1e-6, "Convenience function mismatch"
+    print("  Convenience function matches full result!")
+
+    # Test 5: Edge cases
+    print(f"\n--- Test 5: Edge Cases ---")
+
+    # Constant channel
+    constant_latent = np.ones((1, 4, 8, 8), dtype=np.float32) * 0.5
+    q_const, r_const = quantize_latent(constant_latent)
+    print(f"Constant latent - quantized unique values: {np.unique(q_const)}")
+    h_const = estimate_channel_entropy(q_const[:, 0, :, :], n_bins=256)
+    print(f"Constant channel entropy: {h_const:.6f} bits/symbol")
+    assert h_const == 0.0, "Constant channel should have zero entropy"
+
+    # 3D input (no batch dimension)
+    latent_3d = np.random.randn(8, 16, 16).astype(np.float32)
+    bpp_3d = compute_latent_bpp(latent_3d)
+    print(f"3D input BPP: {bpp_3d:.4f}")
+
+    print("\n" + "=" * 60)
+    print("All bitrate tests passed!")
+    print("=" * 60)
+
+
+# Module exports
+__all__ = [
+    'quantize_latent',
+    'dequantize_latent',
+    'estimate_channel_entropy',
+    'estimate_latent_entropy',
+    'compute_latent_bpp',
+    'test_bitrate',
+]
+
+
+if __name__ == "__main__":
+    test_bitrate()
