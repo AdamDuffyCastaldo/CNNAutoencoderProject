@@ -1,0 +1,58 @@
+{
+  "sweep_type": "resnet_training",
+  "timestamp": "2026-01-29T22:37:11.786998",
+  "config": {
+    "model": "resnet",
+    "base_channels": 64,
+    "learning_rate": 0.0001,
+    "optimizer": "adamw",
+    "scheduler": "plateau",
+    "epochs": 35,
+    "sweep_configs": [
+      {
+        "latent_channels": 32,
+        "ratio": 8,
+        "batch_size": 16
+      }
+    ],
+    "train_subset": 0.1
+  },
+  "results": [
+    {
+      "run_name": "resnet_c64_b64_cr4x_20260129_141535",
+      "latent_channels": 64,
+      "compression_ratio": 4,
+      "batch_size": 8,
+      "parameters": 22400000,
+      "epochs_trained": 17,
+      "checkpoint": "checkpoints\\resnet_c64_b64_cr4x_20260129_141535\\best.pth",
+      "best_val_loss": 0.049603598898550344,
+      "best_psnr": 25.42072191057612,
+      "best_ssim": 0.9036659733237813
+    },
+    {
+      "run_name": "resnet_c32_b64_cr8x_20260128_213848",
+      "latent_channels": 32,
+      "compression_ratio": 8,
+      "batch_size": 16,
+      "parameters": 22400000,
+      "epochs_trained": 30,
+      "checkpoint": "checkpoints\\resnet_c32_b64_cr8x_20260128_213848\\best.pth",
+      "best_val_loss": 0.08001107629388571,
+      "best_psnr": 23.647480272779276,
+      "best_ssim": 0.8442965398232142
+    },
+    {
+      "run_name": "resnet_c16_b64_cr16x_20260128_003926",
+      "latent_channels": 16,
+      "compression_ratio": 16.0,
+      "batch_size": 16,
+      "parameters": 22400000,
+      "epochs_trained": 35,
+      "checkpoint": "checkpoints\\resnet_c16_b64_cr16x_20260128_003926\\best.pth",
+      "best_val_loss": 0.13622396585507315,
+      "best_psnr": 21.449907167583493,
+      "best_ssim": 0.7347162061549247
+    }
+  ]
+}

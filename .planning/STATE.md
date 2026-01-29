@@ -6,15 +6,15 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 6 (Final Experiments) - Plan 01 complete, awaiting manual training
+**Current Focus:** Phase 6 (Final Experiments) - Plan 02 complete, ready for report generation
 
 ---
 
 ## Current Position
 
 **Phase:** 6 of 7 (Final Experiments) - IN PROGRESS
-**Plan:** 01 of 03 complete (Checkpoint Verification)
-**Status:** Awaiting manual ResNet 4x/8x training before Plan 06-02
+**Plan:** 02 of 03 complete (Systematic Evaluation)
+**Status:** Ready for Plan 06-03 (Technical Report Generation)
 
 **Progress:**
 ```
@@ -23,63 +23,55 @@ Phase 2: Baseline Model     [##########] 100%
 Phase 3: SAR Evaluation     [##########] 100%
 Phase 4: Architecture       [##########] 100%
 Phase 5: Full Inference     [##########] 100%
-Phase 6: Final Experiments  [###-------] 33%    <- Plan 01 complete, awaiting training
+Phase 6: Final Experiments  [######----] 67%    <- Plan 02 complete
 Phase 7: Deployment         [----------] 0%
 ```
 
 **Phase 6 Progress:**
 - [x] Plan 01: Checkpoint verification and training setup
-- [ ] **USER ACTION:** Run ResNet 4x/8x training (~2-3 hours)
-- [ ] Plan 02: Comprehensive evaluation
+- [x] Plan 02: Comprehensive evaluation (9 models)
 - [ ] Plan 03: Technical report generation
 
 ---
 
-## Performance Metrics
+## Performance Metrics (Updated from Evaluation Sweep)
 
-| Metric | Target | Current (ResNet) | Status |
-|--------|--------|------------------|--------|
-| PSNR @ 16x | >25 dB | 21.13 dB | Below target (expected at 16x) |
-| SSIM @ 16x | >0.85 | 0.739 | Below target |
-| ENL ratio | 0.8-1.2 | ~0.85 | OK |
-| EPI | >0.85 | ~0.88 | OK |
+| Metric | Target | ResNet 4x | ResNet 8x | ResNet 16x | Status |
+|--------|--------|-----------|-----------|------------|--------|
+| PSNR | >25 dB | 24.95 dB | 23.13 dB | 20.52 dB | 4x meets target |
+| SSIM | >0.85 | 0.9074 | 0.8568 | 0.7536 | 4x, 8x meet target |
+| ENL ratio | 0.8-1.2 | 1.03 | 1.10 | 1.01 | All OK |
+| EPI | >0.85 | 0.955 | 0.929 | 0.886 | All meet target |
 
-### Architecture Comparison @ 16x (Final)
+### Rate-Distortion Comparison (Evaluation Sweep Results)
 
-| Model | Params | Val Loss | Val PSNR | Val SSIM | Status |
-|-------|--------|----------|----------|----------|--------|
-| Baseline (b=64) | 2.3M | 0.2201 | 19.09 dB | 0.572 | Undertrained |
-| **ResNet (b=64)** | **22.4M** | **0.1342** | **21.13 dB** | **0.739** | **SELECTED** |
+| Model | Ratio | PSNR (dB) | SSIM | EPI | Notes |
+|-------|-------|-----------|------|-----|-------|
+| resnet_4x | 4x | 24.95 | 0.9074 | 0.9550 | Best autoencoder |
+| baseline_4x | 4x | 24.41 | 0.8714 | 0.9460 | |
+| jpeg2000_4x | 4x | 53.21 | 0.9999 | 1.0000 | Near-lossless |
+| resnet_8x | 8x | 23.13 | 0.8568 | 0.9291 | Good quality |
+| baseline_8x | 8x | 21.27 | 0.7182 | 0.8774 | |
+| jpeg2000_8x | 8x | 41.24 | 0.9975 | 0.9993 | |
+| resnet_16x | 16x | 20.52 | 0.7536 | 0.8865 | Acceptable |
+| baseline_16x | 16x | 18.81 | 0.6095 | 0.8434 | Below target |
+| jpeg2000_16x | 16x | 30.92 | 0.9691 | 0.9909 | |
 
-**Winner: ResNet b=64** — +2.04 dB PSNR, +29% SSIM over baseline at 16x.
+**Key insights:**
+- ResNet consistently outperforms baseline (+0.5 to +1.9 dB)
+- ResNet 8x quality similar to baseline 4x at 2x more compression
+- JPEG-2000 vastly outperforms autoencoders (operates on 8-bit, AE on float32)
 
-### Rate-Distortion Curve (Baseline)
-
-| Ratio | Latent Ch | PSNR | SSIM | Notes |
-|-------|-----------|------|------|-------|
-| 4x | 64 | 24.15 dB | 0.855 | Meets SSIM target |
-| 8x | 32 | 21.34 dB | 0.675 | Similar to ResNet@16x |
-| 12x | 21 | 19.48 dB | 0.595 | Below targets |
-| 16x | 16 | 19.09 dB | 0.572 | Below targets |
-
-**Key insight:** ResNet @16x (21.13 dB) achieves similar quality to Baseline @8x (21.34 dB).
-
-### Best Checkpoints
+### Best Checkpoints (All 6)
 
 | Model | Checkpoint | PSNR | SSIM |
 |-------|------------|------|------|
-| **ResNet 16x** | `notebooks/checkpoints/resnet_c16_b64_cr16x_20260128_003926/best.pth` | 21.13 dB | 0.739 |
-| Baseline 4x | `notebooks/checkpoints/baseline_c64_b64_cr4x_20260127_195355/best.pth` | 24.15 dB | 0.855 |
-| Baseline 8x | `notebooks/checkpoints/baseline_c32_b64_cr8x_20260127_205741/best.pth` | 21.34 dB | 0.675 |
-| Baseline 12x | `notebooks/checkpoints/baseline_c21_b64_cr12x_20260127_220001/best.pth` | 19.48 dB | 0.595 |
-| Baseline 16x | `notebooks/checkpoints/baseline_c16_b64_cr16x_20260127_231730/best.pth` | 19.09 dB | 0.572 |
-
-### Codec Baselines (Random Noise Test @ 16x)
-
-| Codec | PSNR | SSIM | Notes |
-|-------|------|------|-------|
-| JPEG-2000 | 18.6 dB | 0.914 | Wavelet-based, best traditional |
-| JPEG | 17.2 dB | 0.886 | DCT-based, blocking artifacts |
+| **ResNet 4x** | `notebooks/checkpoints/resnet_c64_b64_cr4x_20260129_141535/best.pth` | 24.95 dB | 0.9074 |
+| ResNet 8x | `notebooks/checkpoints/resnet_c32_b64_cr8x_20260128_213848/best.pth` | 23.13 dB | 0.8568 |
+| ResNet 16x | `notebooks/checkpoints/resnet_c16_b64_cr16x_20260128_003926/best.pth` | 20.52 dB | 0.7536 |
+| Baseline 4x | `notebooks/checkpoints/baseline_c64_b64_cr4x_20260128_181726/best.pth` | 24.41 dB | 0.8714 |
+| Baseline 8x | `notebooks/checkpoints/baseline_c32_b64_cr8x_20260128_192221/best.pth` | 21.27 dB | 0.7182 |
+| Baseline 16x | `notebooks/checkpoints/baseline_c16_b64_cr16x_20260127_231730/best.pth` | 18.81 dB | 0.6095 |
 
 ---
 
@@ -112,6 +104,8 @@ Phase 7: Deployment         [----------] 0%
 | CLI exit codes | Distinct codes enable scripting/automation | 0=success, 1=file, 2=model, 3=OOM, 4=general |
 | Nodata handling in compression | Replace with median, store mask separately | Enables lossless nodata preservation |
 | **ResNet b=64 for 16x** | +2 dB over baseline, proper hyperparameters work | **Selected as best architecture** |
+| **Shared sample evaluation** | Enables paired statistical tests | 200 samples for all 9 models |
+| **Per-sample metric storage** | JSON format with explicit indices | Enables t-tests, detailed analysis |
 
 ### Technical Notes
 
@@ -119,10 +113,8 @@ Phase 7: Deployment         [----------] 0%
 - **Dataset:** 696,277 patches across 44 .npy files (182GB), lazy loaded via mmap
 - **Preprocessing params:** vmin=14.7688, vmax=24.5407
 - **Hardware:** RTX 3070 with 8GB VRAM, batch_size=16 for ResNet with AMP
-- **Best model:** ResNet b=64 (22.4M params) — 21.13 dB @ 16x
-- **Compression:** 16x (256x256x1 -> 16x16x16 latent)
-- **Training:** 35 epochs, 10% data subset, LR=1e-4, AdamW, ReduceLROnPlateau
-- **All models undertrained:** No early stopping triggered, still improving at epoch 35
+- **Best model:** ResNet 4x (24.95 dB, 0.9074 SSIM) for quality-critical applications
+- **Evaluation:** 200 test samples, all models evaluated on identical data
 - **Building blocks ready:** PreActResidualBlock, PreActResidualBlockDown, PreActResidualBlockUp, CBAM
 - **GeoTIFF I/O:** read_geotiff, write_geotiff, write_cog with metadata preservation
 - **Tiling:** Cosine-squared blending with offset padding, <1e-7 reconstruction error
@@ -135,9 +127,9 @@ Phase 7: Deployment         [----------] 0%
 
 ### TODOs (Deferred Items)
 
-- [ ] Longer training run for ResNet (model still improving at epoch 35)
+- [ ] Longer training run for ResNet (models still improving)
 - [ ] Full dataset training (currently using 10% subset)
-- [ ] Consider ResNet at other ratios (4x, 8x) if needed
+- [ ] Quantization analysis for reduced model size
 
 ---
 
@@ -145,23 +137,25 @@ Phase 7: Deployment         [----------] 0%
 
 ### Last Session
 
-- **Date:** 2026-01-28
-- **Activity:** Executed Plan 06-01 (Checkpoint Verification and Training Setup)
+- **Date:** 2026-01-29
+- **Activity:** Executed Plan 06-02 (Systematic Evaluation Sweep)
 - **Outcome:**
-  - Verified 4 checkpoints: baseline (4x, 8x, 16x) + ResNet 16x
-  - Confirmed sweep config ready for ResNet 4x/8x training
-  - Documented manual training instructions
-  - Plan 06-01 complete
+  - Evaluated all 6 autoencoder models + 3 JPEG-2000 baselines
+  - Collected per-sample metrics for statistical analysis
+  - Saved results to JSON/CSV format
+  - Plan 06-02 complete
 
 ### Next Session
 
-- **Priority:** Run manual training, then execute Plan 06-02
-- **User action required:**
-  ```bash
-  python scripts/train_sweep.py --sweep configs/sweep_resnet_ratios.yaml --data-path D:/Projects/CNNAutoencoderProject/data/patches/metadata.npy
-  ```
-- **Expected runtime:** ~2-3 hours
-- **After training:** Execute Plan 06-02 for comprehensive evaluation
+- **Priority:** Execute Plan 06-03 (Technical Report Generation)
+- **Artifacts ready:**
+  - `reports/data/all_results.json` - Aggregated metrics
+  - `reports/data/per_sample_metrics.json` - Per-sample data
+  - `reports/tables/results_summary.csv` - Summary table
+- **Expected outputs:**
+  - Rate-distortion plots
+  - Statistical significance tests
+  - Technical report in Markdown format
 
 ---
 
@@ -172,38 +166,30 @@ Phase 7: Deployment         [----------] 0%
 - Requirements: `.planning/REQUIREMENTS.md`
 - Research: `.planning/research/SUMMARY.md`
 - Roadmap: `.planning/ROADMAP.md`
-- Phase 4 Summaries: `.planning/phases/04-architecture/04-*-SUMMARY.md`
-- Phase 5 Summaries: `.planning/phases/05-inference/05-*-SUMMARY.md`
+- Phase 6 Summaries: `.planning/phases/06-final-experiments/06-*-SUMMARY.md`
+
+**Evaluation Results:**
+- `reports/data/all_results.json` - All 9 models aggregated
+- `reports/data/per_sample_metrics.json` - Per-sample for statistics
+- `reports/tables/results_summary.csv` - Summary table
 
 **Codebase Entry Points:**
 - Preprocessing: `src/data/preprocessing.py`
 - Dataset classes: `src/data/dataset.py`
 - DataModule: `src/data/datamodule.py`
-- Models: `src/models/` (SARAutoencoder, ResNetAutoencoder, ResidualAutoencoder, AttentionAutoencoder)
-- Building blocks: `src/models/blocks.py` (includes PreActResidual*, CBAM)
+- Models: `src/models/` (SARAutoencoder, ResNetAutoencoder)
+- Building blocks: `src/models/blocks.py`
 - Training: `src/training/trainer.py`
 - Evaluation metrics: `src/evaluation/metrics.py`
 - Codec baselines: `src/evaluation/codec_baselines.py`
-- Evaluator: `src/evaluation/evaluator.py`
-- Visualizer: `src/evaluation/visualizer.py`
-- CLI evaluation: `scripts/evaluate_model.py`
-- **SARCompressor: `src/inference/compressor.py`**
-- **GeoTIFF I/O: `src/inference/geotiff.py`**
-- **Tiling: `src/inference/tiling.py`**
-- **CLI: `scripts/sarcodec.py`** (compress/decompress commands)
+- **Evaluation sweep: `scripts/run_evaluation_sweep.py`**
+- SARCompressor: `src/inference/compressor.py`
+- CLI: `scripts/sarcodec.py`
 
-**Best Checkpoint:**
-- **ResNet 16x:** `notebooks/checkpoints/resnet_c16_b64_cr16x_20260128_003926/best.pth`
-
-**Evaluation:**
-- Run: `python scripts/evaluate_model.py --checkpoint path/to/model.pth`
-- With codecs: `python scripts/evaluate_model.py --checkpoint path/to/model.pth --compare-codecs`
-- Output: `evaluations/{model_name}/` with JSON and visualizations
-
-**Full Image Compression:**
-- Compress: `python scripts/sarcodec.py compress input.tif -o output.npz`
-- Decompress: `python scripts/sarcodec.py decompress output.npz -o reconstructed.tif`
+**Best Checkpoints:**
+- **ResNet 4x:** `notebooks/checkpoints/resnet_c64_b64_cr4x_20260129_141535/best.pth`
+- **ResNet 8x:** `notebooks/checkpoints/resnet_c32_b64_cr8x_20260128_213848/best.pth`
 
 ---
 
-*State updated: 2026-01-28 (Plan 06-01 complete — awaiting manual training)*
+*State updated: 2026-01-29 (Plan 06-02 complete — ready for report generation)*
