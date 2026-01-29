@@ -1,73 +1,3 @@
----
-phase: 06-final-experiments
-plan: 02
-type: execute
-wave: 2
-depends_on: [06-01]
-files_modified:
-  - reports/data/all_results.json
-  - reports/data/per_sample_metrics.json
-  - reports/tables/results_summary.csv
-  - scripts/run_evaluation_sweep.py
-autonomous: true
-
-must_haves:
-  truths:
-    - "All 5 autoencoder models evaluated with full metrics (PSNR, SSIM, MS-SSIM, ENL ratio, EPI)"
-    - "JPEG-2000 evaluated at 4x, 8x, 16x compression ratios"
-    - "Per-sample metrics saved for statistical analysis with sample pairing"
-  artifacts:
-    - path: "reports/data/all_results.json"
-      provides: "Aggregated evaluation results for all models and codecs"
-    - path: "reports/data/per_sample_metrics.json"
-      provides: "Per-sample metrics for paired statistical tests"
-    - path: "reports/tables/results_summary.csv"
-      provides: "Summary metrics table for report"
-    - path: "scripts/run_evaluation_sweep.py"
-      provides: "Reproducible evaluation script"
-  key_links:
-    - from: "scripts/run_evaluation_sweep.py"
-      to: "src/evaluation/evaluator.py"
-      via: "Evaluator class"
-      pattern: "Evaluator\\("
-    - from: "scripts/run_evaluation_sweep.py"
-      to: "src/evaluation/codec_baselines.py"
-      via: "CodecEvaluator class"
-      pattern: "CodecEvaluator\\("
----
-
-<objective>
-Systematically evaluate all models and JPEG-2000 codec, collecting per-sample metrics for statistical comparison.
-
-Purpose: Build the complete dataset for rate-distortion analysis and statistical hypothesis testing (autoencoder vs JPEG-2000).
-
-Output: JSON files with evaluation results, per-sample metrics for statistics, and summary CSV for reporting.
-</objective>
-
-<execution_context>
-@~/.claude/get-shit-done/workflows/execute-plan.md
-@~/.claude/get-shit-done/templates/summary.md
-</execution_context>
-
-<context>
-@.planning/PROJECT.md
-@.planning/STATE.md
-@.planning/phases/06-final-experiments/06-CONTEXT.md
-@.planning/phases/06-final-experiments/06-RESEARCH.md
-@src/evaluation/evaluator.py
-@src/evaluation/codec_baselines.py
-@scripts/evaluate_model.py
-</context>
-
-<tasks>
-
-<task type="auto">
-  <name>Task 1: Create systematic evaluation script with dynamic checkpoint discovery</name>
-  <files>scripts/run_evaluation_sweep.py</files>
-  <action>
-Create a comprehensive evaluation script at `scripts/run_evaluation_sweep.py`:
-
-```python
 #!/usr/bin/env python3
 """
 Systematic evaluation sweep for all autoencoder models and JPEG-2000 codec.
@@ -93,7 +23,9 @@ import torch
 from tqdm import tqdm
 
 from src.data.datamodule import SARDataModule
-from src.evaluation import Evaluator
+from src.evaluation.metrics import (
+    SARMetrics, compute_ms_ssim, enl_ratio, edge_preservation_index
+)
 from src.evaluation.codec_baselines import JPEG2000Codec, CodecEvaluator
 
 
@@ -105,11 +37,11 @@ def discover_checkpoints():
     checkpoint_dir = Path('notebooks/checkpoints')
 
     # Pattern -> model name mapping
-    # Note: ResNet 4x skipped (training time constraints)
     patterns = {
         'baseline_4x': 'baseline_c64_b64_cr4x_*',
         'baseline_8x': 'baseline_c32_b64_cr8x_*',
         'baseline_16x': 'baseline_c16_b64_cr16x_*',
+        'resnet_4x': 'resnet_c64_b64_cr4x_*',
         'resnet_8x': 'resnet_c32_b64_cr8x_*',
         'resnet_16x': 'resnet_c16_b64_cr16x_*',
     }
@@ -165,6 +97,17 @@ def load_model_from_checkpoint(checkpoint_path: str, device: torch.device):
     return model, preprocessing_params
 
 
+def get_compression_ratio_from_name(model_name: str) -> float:
+    """Extract compression ratio from model name like 'baseline_4x' -> 4.0"""
+    if '4x' in model_name:
+        return 4.0
+    elif '8x' in model_name:
+        return 8.0
+    elif '16x' in model_name:
+        return 16.0
+    return 16.0  # default
+
+
 def get_test_images_with_indices(dataloader, n_samples: int):
     """
     Extract test images with indices for per-sample pairing.
@@ -188,11 +131,6 @@ def evaluate_autoencoder_per_sample(model, dataloader, device, n_samples: int):
     Evaluate autoencoder and return per-sample metrics.
     Returns dict mapping sample_index -> metrics dict.
     """
-    from src.evaluation.metrics import (
-        compute_psnr, compute_ssim, compute_ms_ssim,
-        compute_enl_ratio, compute_epi
-    )
-
     per_sample = {}
     sample_idx = 0
 
@@ -209,16 +147,28 @@ def evaluate_autoencoder_per_sample(model, dataloader, device, n_samples: int):
                 if sample_idx >= n_samples:
                     return per_sample
 
-                orig = batch[i:i+1]
-                rec = recon[i:i+1]
+                # Convert to numpy for metrics
+                orig_np = batch[i, 0].cpu().numpy()
+                rec_np = recon[i, 0].cpu().numpy()
 
                 # Compute all metrics for this sample
+                try:
+                    ms_ssim_val = compute_ms_ssim(orig_np, rec_np, data_range=1.0)
+                except Exception:
+                    ms_ssim_val = float('nan')
+
+                try:
+                    enl_result = enl_ratio(orig_np, rec_np)
+                    enl_val = enl_result.get('ratio', float('nan')) if isinstance(enl_result, dict) else float(enl_result)
+                except Exception:
+                    enl_val = float('nan')
+
                 per_sample[sample_idx] = {
-                    'psnr': compute_psnr(orig, rec).item(),
-                    'ssim': compute_ssim(orig, rec).item(),
-                    'ms_ssim': compute_ms_ssim(orig, rec).item(),
-                    'enl_ratio': compute_enl_ratio(orig, rec).item(),
-                    'epi': compute_epi(orig, rec).item(),
+                    'psnr': SARMetrics.psnr(orig_np, rec_np, data_range=1.0),
+                    'ssim': SARMetrics.ssim(orig_np, rec_np, data_range=1.0),
+                    'ms_ssim': ms_ssim_val,
+                    'enl_ratio': enl_val,
+                    'epi': edge_preservation_index(orig_np, rec_np),
                 }
                 sample_idx += 1
 
@@ -231,12 +181,6 @@ def evaluate_codec_per_sample(codec_evaluator, test_images, target_ratio: float)
     test_images is list of (index, image_array) tuples.
     Returns dict mapping sample_index -> metrics dict.
     """
-    from src.evaluation.metrics import (
-        compute_psnr, compute_ssim, compute_ms_ssim,
-        compute_enl_ratio, compute_epi
-    )
-    import torch
-
     per_sample = {}
 
     for idx, img in tqdm(test_images, desc=f"Evaluating JPEG-2000 @ {target_ratio}x"):
@@ -244,16 +188,24 @@ def evaluate_codec_per_sample(codec_evaluator, test_images, target_ratio: float)
         compressed = codec_evaluator.codec.compress(img, target_ratio)
         reconstructed = codec_evaluator.codec.decompress(compressed)
 
-        # Convert to tensors for metric computation
-        orig_t = torch.from_numpy(img).unsqueeze(0).unsqueeze(0).float()
-        recon_t = torch.from_numpy(reconstructed).unsqueeze(0).unsqueeze(0).float()
+        # Compute metrics using numpy arrays
+        try:
+            ms_ssim_val = compute_ms_ssim(img, reconstructed, data_range=1.0)
+        except Exception:
+            ms_ssim_val = float('nan')
+
+        try:
+            enl_result = enl_ratio(img, reconstructed)
+            enl_val = enl_result.get('ratio', float('nan')) if isinstance(enl_result, dict) else float(enl_result)
+        except Exception:
+            enl_val = float('nan')
 
         per_sample[idx] = {
-            'psnr': compute_psnr(orig_t, recon_t).item(),
-            'ssim': compute_ssim(orig_t, recon_t).item(),
-            'ms_ssim': compute_ms_ssim(orig_t, recon_t).item(),
-            'enl_ratio': compute_enl_ratio(orig_t, recon_t).item(),
-            'epi': compute_epi(orig_t, recon_t).item(),
+            'psnr': SARMetrics.psnr(img, reconstructed, data_range=1.0),
+            'ssim': SARMetrics.ssim(img, reconstructed, data_range=1.0),
+            'ms_ssim': ms_ssim_val,
+            'enl_ratio': enl_val,
+            'epi': edge_preservation_index(img, reconstructed),
         }
 
     return per_sample
@@ -315,9 +267,11 @@ def main():
     print("\nDiscovering checkpoints...")
     checkpoints = discover_checkpoints()
 
-    if len(checkpoints) < 5:
-        print(f"\nWarning: Found only {len(checkpoints)} checkpoints, expected 5")
-        print("Continuing with available checkpoints...")
+    if len(checkpoints) == 0:
+        print("\nERROR: No checkpoints found!")
+        sys.exit(1)
+
+    print(f"\nFound {len(checkpoints)} checkpoints")
 
     # Load test data
     print("\nLoading test data...")
@@ -351,7 +305,7 @@ def main():
         print(f"Checkpoint: {ckpt_path}")
 
         model, preproc_params = load_model_from_checkpoint(ckpt_path, device)
-        compression_ratio = model.get_compression_ratio() if hasattr(model, 'get_compression_ratio') else 16.0
+        compression_ratio = get_compression_ratio_from_name(model_name)
 
         # Per-sample evaluation
         per_sample = evaluate_autoencoder_per_sample(
@@ -466,147 +420,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-```
-
-Key implementation points:
-- Dynamic checkpoint discovery using glob patterns (not hardcoded paths)
-- Per-sample metrics with index tracking for paired statistical tests
-- Same test samples used for ALL models (autoencoders AND codecs)
-- Explicit sample pairing: `test_images` list preserves indices throughout
-- Aggregated metrics (mean/std/min/max) for quick reference
-- CSV summary for easy inspection
-  </action>
-  <verify>python scripts/run_evaluation_sweep.py --help shows usage with all arguments</verify>
-  <done>Evaluation script exists with dynamic checkpoint discovery, per-sample pairing, and structured output</done>
-</task>
-
-<task type="auto">
-  <name>Task 2: Run evaluation sweep on all models</name>
-  <files>reports/data/all_results.json, reports/data/per_sample_metrics.json</files>
-  <action>
-Execute the evaluation sweep:
-
-```bash
-# Create output directories
-mkdir -p reports/data reports/tables reports/figures
-
-# Run evaluation
-python scripts/run_evaluation_sweep.py \
-    --output-dir reports \
-    --n-samples 2000 \
-    --batch-size 16
-```
-
-This will:
-1. Discover all checkpoint paths dynamically via glob
-2. Load each checkpoint and evaluate on test set
-3. Compute PSNR, SSIM, MS-SSIM, ENL ratio, EPI for each sample
-4. Evaluate JPEG-2000 at 4x, 8x, 16x on SAME images (paired by index)
-5. Save all results to JSON files
-
-Expected runtime: ~30-45 minutes (2000 samples x 6 models + codec)
-
-Monitor for:
-- Memory usage during codec evaluation
-- All models loading correctly (check for state_dict errors)
-- JSON files being written at end
-  </action>
-  <verify>
-Check output files exist and contain data:
-```bash
-cat reports/data/all_results.json | python -c "import json,sys; d=json.load(sys.stdin); print(f'Models: {len(d)}')"
-cat reports/tables/results_summary.csv | head -10
-```
-  </verify>
-  <done>Evaluation complete with all 5 autoencoders and JPEG-2000 at 3 ratios</done>
-</task>
-
-<task type="auto">
-  <name>Task 3: Validate evaluation results and sample pairing</name>
-  <files></files>
-  <action>
-Verify the evaluation produced sensible results with proper sample pairing:
-
-```python
-import json
-import pandas as pd
-
-# Load results
-with open('reports/data/all_results.json') as f:
-    results = json.load(f)
-
-# Check model count
-print(f"Total entries: {len(results)}")
-assert len(results) >= 8, "Expected at least 8 entries (5 AE + 3 codec)"
-
-# Verify per-sample data exists with proper pairing
-with open('reports/data/per_sample_metrics.json') as f:
-    per_sample = json.load(f)
-
-# Check sample counts match across all models
-sample_counts = {name: len(samples) for name, samples in per_sample.items()}
-print("\nSample counts per model:")
-for name, count in sample_counts.items():
-    print(f"  {name}: {count}")
-
-# Verify all models have same samples (for paired tests)
-counts = list(sample_counts.values())
-assert len(set(counts)) == 1, f"Sample counts differ: {sample_counts}"
-print(f"\nAll models have {counts[0]} samples (pairing verified)")
-
-# Verify sample indices match (spot check)
-first_model = list(per_sample.keys())[0]
-sample_indices = set(per_sample[first_model].keys())
-for model_name, samples in per_sample.items():
-    assert set(samples.keys()) == sample_indices, f"{model_name} has different indices"
-print("Sample indices match across all models")
-
-# Quick sanity check: PSNR values should be positive and reasonable
-df = pd.read_csv('reports/tables/results_summary.csv')
-print("\nSummary table:")
-print(df[['name', 'compression_ratio', 'psnr_mean', 'ssim_mean']])
-
-# Verify PSNR/SSIM ranges
-assert (df['psnr_mean'] > 15).all(), "Some PSNR values too low"
-assert (df['psnr_mean'] < 35).all(), "Some PSNR values too high"
-assert (df['ssim_mean'] > 0.3).all(), "Some SSIM values too low"
-assert (df['ssim_mean'] <= 1.0).all(), "Some SSIM values too high"
-print("\nMetric ranges validated")
-```
-
-Expected observations:
-- All 5 autoencoder models present (baseline 4x/8x/16x, ResNet 8x/16x)
-- JPEG-2000 at 3 ratios present (total 8 entries)
-- All models have identical sample count
-- Sample indices match across all models (enables paired t-tests)
-- PSNR values: 18-30 dB range
-- SSIM values: 0.5-0.95 range
-  </action>
-  <verify>Summary table shows 8 rows (5 autoencoders + 3 JPEG-2000) with reasonable metrics and matched sample counts</verify>
-  <done>Evaluation data validated - all models present with proper sample pairing for statistical tests</done>
-</task>
-
-</tasks>
-
-<verification>
-1. Script exists: `scripts/run_evaluation_sweep.py` with --help working
-2. Dynamic discovery: Script finds checkpoints via glob, not hardcoded paths
-3. Results JSON: `reports/data/all_results.json` with 8 entries
-4. Per-sample JSON: `reports/data/per_sample_metrics.json` with per-image data
-5. Sample pairing: All models have same sample count and indices
-6. Summary CSV: `reports/tables/results_summary.csv` with all models
-7. PSNR/SSIM values in reasonable ranges
-</verification>
-
-<success_criteria>
-- All 5 autoencoder models evaluated (baseline 4x/8x/16x, ResNet 8x/16x)
-- JPEG-2000 evaluated at 4x, 8x, 16x
-- Per-sample metrics saved with explicit index pairing
-- All models evaluated on SAME test samples
-- Results in structured format ready for statistical analysis
-- No missing data or NaN values in key metrics
-</success_criteria>
-
-<output>
-After completion, create `.planning/phases/06-final-experiments/06-02-SUMMARY.md`
-</output>
