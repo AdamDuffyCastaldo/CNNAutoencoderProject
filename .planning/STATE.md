@@ -6,15 +6,15 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 6.1 (Fair Bitrate Comparison) - Inserted to address JPEG-2000 comparison methodology
+**Current Focus:** Phase 6.1 (Fair Bitrate Comparison) - Plan 01 complete
 
 ---
 
 ## Current Position
 
-**Phase:** 6.1 of 7 (Fair Bitrate Comparison) - NOT STARTED
-**Plan:** 00 of ?? (not yet planned)
-**Status:** Inserted phase - needs planning
+**Phase:** 6.1 of 7 (Fair Bitrate Comparison) - IN PROGRESS
+**Plan:** 01 of ?? (entropy-based bitrate calculation complete)
+**Status:** Plan 01 complete - ready for Plan 02
 
 **Progress:**
 ```
@@ -24,11 +24,16 @@ Phase 3: SAR Evaluation     [##########] 100%
 Phase 4: Architecture       [##########] 100%
 Phase 5: Full Inference     [##########] 100%
 Phase 6: Final Experiments  [##########] 100%
-Phase 6.1: Fair Bitrate     [----------] 0%     <- INSERTED (urgent)
+Phase 6.1: Fair Bitrate     [##--------] 20%     <- IN PROGRESS
 Phase 7: Deployment         [----------] 0%
 ```
 
-**Phase 6 Progress:**
+**Phase 6.1 Progress:**
+- [x] Plan 01: Entropy-based bitrate calculation module
+- [ ] Plan 02: JPEG-2000 R-D curve generation
+- [ ] Plan 03: Bitrate-matched comparison and report update
+
+**Phase 6 Progress (Complete):**
 - [x] Plan 01: Checkpoint verification and training setup
 - [x] Plan 02: Comprehensive evaluation (9 models)
 - [x] Plan 03: Technical report generation
@@ -115,6 +120,9 @@ Phase 7: Deployment         [----------] 0%
 | **Data precision mismatch** | JPEG-2000 on 8-bit, autoencoders on float32 | Unfair comparison - document clearly |
 | **Wilcoxon for non-normal** | Shapiro-Wilk test selects appropriate test | More robust statistical inference |
 | **Bonferroni correction** | Multiple comparisons need adjustment | alpha=0.00278 for 18 tests |
+| **Per-channel quantization** | Different channels have different distributions | Preserves more precision |
+| **Entropy base=2** | scipy.stats.entropy with base=2 for bits | Standard learned compression practice |
+| **64-bit overhead per channel** | 32-bit float x 2 (min/max) | Include storage cost for quantization params |
 
 ### Technical Notes
 
@@ -147,26 +155,25 @@ Phase 7: Deployment         [----------] 0%
 ### Last Session
 
 - **Date:** 2026-01-29
-- **Activity:** Executed Plan 06-03 (Technical Report Generation)
+- **Activity:** Executed Plan 06.1-01 (Entropy-Based Bitrate Calculation)
 - **Outcome:**
-  - Generated rate-distortion curves (PSNR and SSIM vs BPP)
-  - Performed statistical tests with Bonferroni correction
-  - Created visual comparison gallery for all compression ratios
-  - Published final markdown report with executive summary
-  - Phase 6 complete
+  - Implemented src/evaluation/bitrate.py (732 lines)
+  - Per-channel quantization and dequantization functions
+  - Shannon entropy estimation using scipy.stats.entropy(base=2)
+  - Validated on real ResNet 16x model latents
+  - Entropy BPP = 0.45 vs Geometric BPP = 2.0 (77% reduction)
+  - Quantization degradation negligible (<0.01 dB)
 
 ### Next Session
 
-- **Priority:** Begin Phase 7 (Deployment)
-- **Phase 6 outputs ready:**
-  - `reports/final_comparison.ipynb` - Reproducible analysis notebook
-  - `reports/final_comparison.md` - Final report with executive summary
-  - `reports/figures/` - Rate-distortion and visual comparison figures
-  - `reports/tables/statistical_tests.csv` - Statistical analysis results
-- **Expected Phase 7 work:**
-  - Package model for distribution
-  - CLI documentation
-  - Deployment scripts
+- **Priority:** Continue Phase 6.1 (Plan 02 - JPEG-2000 R-D curve)
+- **Phase 6.1-01 outputs ready:**
+  - `src/evaluation/bitrate.py` - Entropy-based BPP calculation
+  - Functions: quantize_latent, dequantize_latent, estimate_latent_entropy, compute_latent_bpp
+- **Expected Phase 6.1-02 work:**
+  - Generate fine-grained JPEG-2000 R-D curve (20+ quality points)
+  - Interpolate to match autoencoder BPP
+  - Create bitrate-matched comparison
 
 ---
 
@@ -200,6 +207,7 @@ Phase 7: Deployment         [----------] 0%
 - Training: `src/training/trainer.py`
 - Evaluation metrics: `src/evaluation/metrics.py`
 - Codec baselines: `src/evaluation/codec_baselines.py`
+- **Bitrate estimation: `src/evaluation/bitrate.py`** (NEW)
 - **Evaluation sweep: `scripts/run_evaluation_sweep.py`**
 - SARCompressor: `src/inference/compressor.py`
 - CLI: `scripts/sarcodec.py`
@@ -210,4 +218,4 @@ Phase 7: Deployment         [----------] 0%
 
 ---
 
-*State updated: 2026-01-29 (Phase 6 complete - ready for Phase 7 Deployment)*
+*State updated: 2026-01-29 (Phase 6.1 Plan 01 complete - entropy-based bitrate calculation)*
