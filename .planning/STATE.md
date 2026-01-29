@@ -6,15 +6,15 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 6 Complete - Ready for Phase 7 (Deployment)
+**Current Focus:** Phase 6.1 (Fair Bitrate Comparison) - Inserted to address JPEG-2000 comparison methodology
 
 ---
 
 ## Current Position
 
-**Phase:** 6 of 7 (Final Experiments) - COMPLETE
-**Plan:** 03 of 03 complete (Technical Report Generation)
-**Status:** Ready for Phase 7 (Deployment)
+**Phase:** 6.1 of 7 (Fair Bitrate Comparison) - NOT STARTED
+**Plan:** 00 of ?? (not yet planned)
+**Status:** Inserted phase - needs planning
 
 **Progress:**
 ```
@@ -23,7 +23,8 @@ Phase 2: Baseline Model     [##########] 100%
 Phase 3: SAR Evaluation     [##########] 100%
 Phase 4: Architecture       [##########] 100%
 Phase 5: Full Inference     [##########] 100%
-Phase 6: Final Experiments  [##########] 100%    <- COMPLETE
+Phase 6: Final Experiments  [##########] 100%
+Phase 6.1: Fair Bitrate     [----------] 0%     <- INSERTED (urgent)
 Phase 7: Deployment         [----------] 0%
 ```
 
@@ -60,7 +61,12 @@ Phase 7: Deployment         [----------] 0%
 **Key insights:**
 - ResNet consistently outperforms baseline (+0.5 to +1.9 dB)
 - ResNet 8x quality similar to baseline 4x at 2x more compression
-- JPEG-2000 vastly outperforms autoencoders (operates on 8-bit, AE on float32)
+- JPEG-2000 vastly outperforms autoencoders in raw metrics
+- **Issue identified:** "Compression ratio" means different things:
+  - Autoencoders: geometric latent reduction (256×256→16×16×C)
+  - JPEG-2000: actual file size ratio with entropy coding
+- **8-bit evaluation (reports/8bit/):** Even with matched quantization, JPEG-2000 still wins
+- **Next step:** Compare at matched bits-per-pixel (Phase 6.1)
 
 ### Best Checkpoints (All 6)
 

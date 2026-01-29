@@ -387,6 +387,44 @@ Plans:
 
 ---
 
+## Phase 6.1: Fair Bitrate Comparison (INSERTED)
+
+**Goal:** Implement bitrate-matched evaluation comparing autoencoders vs JPEG-2000 at equivalent bits-per-pixel, with latent quantization analysis. This addresses the apples-to-oranges comparison issue discovered in Phase 6.
+
+**Dependencies:** Phase 6 (Final Experiments)
+
+**Estimated Complexity:** Medium
+
+**Context:** Phase 6 evaluation revealed that comparing "compression ratio" between autoencoders and JPEG-2000 is misleading:
+- Autoencoders: 16x = geometric latent reduction (256×256×1 → 16×16×16)
+- JPEG-2000: 16x = actual file size ratio with entropy coding
+
+Even with 8-bit I/O quantization, JPEG-2000 vastly outperforms autoencoders (31 dB vs 21 dB at "16x"). This phase implements fair bitrate-matched comparison.
+
+**Plans:** 0 plans (run `/gsd:plan-phase 6.1` to break down)
+
+Plans:
+- [ ] TBD - Latent quantization analysis (measure actual bits in autoencoder latent)
+- [ ] TBD - Bitrate-matched comparison (compare at equivalent BPP)
+- [ ] TBD - Update final report with fair comparison results
+
+### Success Criteria
+
+1. Autoencoder actual bitrate calculated assuming optimal entropy coding of quantized latent
+2. JPEG-2000 evaluated at matched bitrates (not matched "compression ratio")
+3. Fair comparison table shows both methods at equivalent bits-per-pixel
+4. Report updated with conclusions about true compression efficiency
+5. Visual comparison at matched bitrates demonstrates quality differences
+
+### Deliverables
+
+- `scripts/analyze_latent_entropy.py` - Calculate actual bits needed for autoencoder latent
+- `reports/8bit/` - Updated evaluation results with bitrate matching
+- Updated `reports/final_comparison.md` with fair comparison section
+- Rate-distortion curves with both methods on same BPP axis
+
+---
+
 ## Phase 7: Deployment
 
 **Goal:** Package the best-performing model for production deployment with multiple export formats, containerization, and optional API serving.
@@ -449,6 +487,7 @@ Plans:
 | 4 - Architecture Enhancement | Complete | 5/5 (ResNet b=64 selected) |
 | 5 - Full Image Inference | Complete | 7/7 |
 | 6 - Final Experiments | Complete | 6/6 (ResNet outperforms Baseline) |
+| 6.1 - Fair Bitrate Comparison | Not Started | 0/5 (INSERTED) |
 | 7 - Deployment | Not Started | 0/6 |
 
 ---
@@ -506,4 +545,5 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 *Phase 5 complete: 2026-01-26*
 *Phase 6 planned: 2026-01-28*
 *Phase 6 complete: 2026-01-29 (ResNet outperforms Baseline at all ratios)*
+*Phase 6.1 inserted: 2026-01-29 (Fair bitrate comparison - urgent)*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
