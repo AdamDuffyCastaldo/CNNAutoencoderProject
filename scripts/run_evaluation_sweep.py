@@ -54,13 +54,17 @@ def discover_checkpoints():
     for name, pattern in patterns.items():
         matches = sorted(glob.glob(str(checkpoint_dir / pattern)))
         if matches:
-            # Take most recent (last in sorted order by timestamp)
-            ckpt_path = Path(matches[-1]) / 'best.pth'
-            if ckpt_path.exists():
-                checkpoints[name] = str(ckpt_path)
-                print(f"  Found {name}: {ckpt_path}")
-            else:
-                print(f"  Warning: {name} directory exists but no best.pth: {matches[-1]}")
+            # Find the most recent directory that actually has best.pth
+            found = False
+            for match in reversed(matches):
+                ckpt_path = Path(match) / 'best.pth'
+                if ckpt_path.exists():
+                    checkpoints[name] = str(ckpt_path)
+                    print(f"  Found {name}: {ckpt_path}")
+                    found = True
+                    break
+            if not found:
+                print(f"  Warning: {name} directories exist but none have best.pth")
         else:
             print(f"  Warning: No checkpoint found for {name} (pattern: {pattern})")
 
@@ -112,7 +116,7 @@ def load_model_from_checkpoint(checkpoint_path: str, model_name: str, device: to
         )
     else:
         from src.models.autoencoder import SARAutoencoder
-        model = SARAutoencoder(in_channels=1, latent_channels=latent_channels)
+        model = SARAutoencoder(latent_channels=latent_channels)
 
     if 'model_state_dict' in checkpoint:
         model.load_state_dict(checkpoint['model_state_dict'])
@@ -436,7 +440,6 @@ def main():
     print(f"Per-sample metrics: {per_sample_path}")
 
     # Summary CSV
-    import pandas as pd
     rows = []
     for name, result in all_results.items():
         metrics = result['metrics']
@@ -454,17 +457,31 @@ def main():
             'epi_mean': metrics.get('epi', {}).get('mean'),
         })
 
-    summary_df = pd.DataFrame(rows)
-    summary_df = summary_df.sort_values(['compression_ratio', 'type', 'name'])
+    # Sort by compression ratio, then type, then name
+    rows.sort(key=lambda x: (x['compression_ratio'], x['type'], x['name']))
+
+    # Write CSV manually (avoid pandas dependency)
     summary_path = output_dir / 'tables' / 'results_summary.csv'
-    summary_df.to_csv(summary_path, index=False)
+    csv_columns = ['name', 'type', 'compression_ratio', 'n_samples', 'psnr_mean', 'psnr_std',
+                   'ssim_mean', 'ssim_std', 'ms_ssim_mean', 'enl_ratio_mean', 'epi_mean']
+    with open(summary_path, 'w') as f:
+        f.write(','.join(csv_columns) + '\n')
+        for row in rows:
+            values = [str(row.get(col, '')) if row.get(col) is not None else '' for col in csv_columns]
+            f.write(','.join(values) + '\n')
     print(f"Summary CSV: {summary_path}")
 
     # Print summary table
     print("\n" + "=" * 70)
     print("SUMMARY TABLE")
     print("=" * 70)
-    print(summary_df[['name', 'compression_ratio', 'psnr_mean', 'ssim_mean', 'epi_mean']].to_string(index=False))
+    print(f"{'Name':<20} {'Ratio':>6} {'PSNR':>10} {'SSIM':>10} {'EPI':>10}")
+    print("-" * 60)
+    for row in rows:
+        psnr_str = f"{row['psnr_mean']:.2f}" if row['psnr_mean'] else "N/A"
+        ssim_str = f"{row['ssim_mean']:.4f}" if row['ssim_mean'] else "N/A"
+        epi_str = f"{row['epi_mean']:.4f}" if row['epi_mean'] else "N/A"
+        print(f"{row['name']:<20} {row['compression_ratio']:>6.0f} {psnr_str:>10} {ssim_str:>10} {epi_str:>10}")
 
     print("\n" + "=" * 70)
     print("EVALUATION COMPLETE")
