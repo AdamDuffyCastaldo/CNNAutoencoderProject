@@ -339,10 +339,12 @@ Plans:
 
 **Plans:** 3 plans
 
+**Status:** Complete
+
 Plans:
-- [ ] 06-01-PLAN.md - Train missing ResNet models (4x, 8x compression ratios)
-- [ ] 06-02-PLAN.md - Systematic evaluation with JPEG-2000 comparison
-- [ ] 06-03-PLAN.md - Statistical analysis and final report generation
+- [x] 06-01-PLAN.md - Checkpoint verification and training setup
+- [x] 06-02-PLAN.md - Systematic evaluation with JPEG-2000 comparison
+- [x] 06-03-PLAN.md - Statistical analysis and final report generation
 
 ### Success Criteria
 
@@ -446,7 +448,7 @@ Plans:
 | 3 - SAR Evaluation | Complete | 6/6 |
 | 4 - Architecture Enhancement | Complete | 5/5 (ResNet b=64 selected) |
 | 5 - Full Image Inference | Complete | 7/7 |
-| 6 - Final Experiments | Planning | 0/6 |
+| 6 - Final Experiments | Complete | 6/6 (ResNet outperforms Baseline) |
 | 7 - Deployment | Not Started | 0/6 |
 
 ---
@@ -503,4 +505,5 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 *Phase 4 complete: 2026-01-28 (ResNet b=64 selected)*
 *Phase 5 complete: 2026-01-26*
 *Phase 6 planned: 2026-01-28*
+*Phase 6 complete: 2026-01-29 (ResNet outperforms Baseline at all ratios)*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
