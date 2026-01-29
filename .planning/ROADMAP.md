@@ -376,14 +376,14 @@ Plans:
 
 ### Key Tasks (High-Level)
 
-- [ ] Train ResNet at 4x, 8x compression (16x already trained)
-- [ ] Evaluate all 6 autoencoder models with full metrics
-- [ ] Evaluate JPEG-2000 at 4x, 8x, 16x on same test set
-- [ ] Collect per-sample metrics for statistical testing
-- [ ] Perform paired statistical tests (t-test or Wilcoxon)
-- [ ] Generate rate-distortion curves (autoencoders + JPEG-2000)
-- [ ] Create visual comparison gallery with error heatmaps
-- [ ] Write final report with conclusions
+- [x] Train ResNet at 4x, 8x compression (16x already trained)
+- [x] Evaluate all 6 autoencoder models with full metrics
+- [x] Evaluate JPEG-2000 at 4x, 8x, 16x on same test set
+- [x] Collect per-sample metrics for statistical testing
+- [x] Perform paired statistical tests (t-test or Wilcoxon)
+- [x] Generate rate-distortion curves (autoencoders + JPEG-2000)
+- [x] Create visual comparison gallery with error heatmaps
+- [x] Write final report with conclusions
 
 ---
 
@@ -396,17 +396,17 @@ Plans:
 **Estimated Complexity:** Medium
 
 **Context:** Phase 6 evaluation revealed that comparing "compression ratio" between autoencoders and JPEG-2000 is misleading:
-- Autoencoders: 16x = geometric latent reduction (256×256×1 → 16×16×16)
+- Autoencoders: 16x = geometric latent reduction (256x256x1 -> 16x16x16)
 - JPEG-2000: 16x = actual file size ratio with entropy coding
 
 Even with 8-bit I/O quantization, JPEG-2000 vastly outperforms autoencoders (31 dB vs 21 dB at "16x"). This phase implements fair bitrate-matched comparison.
 
-**Plans:** 0 plans (run `/gsd:plan-phase 6.1` to break down)
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD - Latent quantization analysis (measure actual bits in autoencoder latent)
-- [ ] TBD - Bitrate-matched comparison (compare at equivalent BPP)
-- [ ] TBD - Update final report with fair comparison results
+- [ ] 06.1-01-PLAN.md - Entropy-based bitrate calculation module (quantization, entropy, BPP)
+- [ ] 06.1-02-PLAN.md - Bitrate-matched evaluation script and R-D curves
+- [ ] 06.1-03-PLAN.md - Update final report with fair comparison results
 
 ### Success Criteria
 
@@ -418,8 +418,9 @@ Plans:
 
 ### Deliverables
 
-- `scripts/analyze_latent_entropy.py` - Calculate actual bits needed for autoencoder latent
-- `reports/8bit/` - Updated evaluation results with bitrate matching
+- `src/evaluation/bitrate.py` - Calculate actual bits needed for autoencoder latent
+- `scripts/run_bitrate_matched_evaluation.py` - Evaluation script
+- `reports/bitrate_matched/` - Evaluation results with bitrate matching
 - Updated `reports/final_comparison.md` with fair comparison section
 - Rate-distortion curves with both methods on same BPP axis
 
@@ -546,4 +547,5 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 *Phase 6 planned: 2026-01-28*
 *Phase 6 complete: 2026-01-29 (ResNet outperforms Baseline at all ratios)*
 *Phase 6.1 inserted: 2026-01-29 (Fair bitrate comparison - urgent)*
+*Phase 6.1 planned: 2026-01-29 (3 plans in 3 waves)*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
