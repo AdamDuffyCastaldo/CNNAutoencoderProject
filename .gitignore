@@ -74,3 +74,5 @@ models/
 compressed_e63d.npz
 reconstructed_e63d_with_georef.tiff
 test_no_cog.tiff
+reconstructed.tif
+reconstructed_georef.tif
