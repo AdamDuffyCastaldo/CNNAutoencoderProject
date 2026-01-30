@@ -1,0 +1,55 @@
+# Git
+.git
+.gitignore
+
+# Planning and documentation
+.planning/
+docs/
+*.md
+!README.md
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Notebooks and experiments
+notebooks/
+experiments/
+learningnotebooks/
+
+# Data (mount at runtime)
+data/
+*.npy
+*.tif
+*.tiff
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Large files (mount models at runtime)
+checkpoints/
+runs/
+reports/
+
+# Node (if any)
+node_modules/
