@@ -1,0 +1,5 @@
+# FastAPI dependencies for SAR Codec API
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+python-multipart>=0.0.18
+aiofiles>=24.1.0
