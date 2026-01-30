@@ -41,6 +41,8 @@ class GeoMetadata:
         height: Image height in pixels
         tags: Dictionary of metadata tags
         descriptions: Tuple of band descriptions (one per band)
+        gcps: List of Ground Control Points (for Sentinel-1 SAFE format)
+        gcps_crs: CRS for GCPs (may differ from image CRS)
     """
     crs: Optional[Any]  # rasterio CRS or None
     transform: Optional[Any]  # rasterio Affine or None
@@ -51,10 +53,15 @@ class GeoMetadata:
     height: int
     tags: Dict[str, str]
     descriptions: Optional[Tuple[str, ...]]
+    gcps: Optional[list] = None  # List of GroundControlPoint objects
+    gcps_crs: Optional[Any] = None  # CRS for GCPs
 
     def has_georef(self) -> bool:
         """Check if metadata contains valid georeferencing."""
-        return self.crs is not None and self.transform is not None
+        # Valid if has CRS+transform OR has GCPs
+        has_affine = self.crs is not None and self.transform is not None
+        has_gcps = self.gcps is not None and len(self.gcps) > 0
+        return has_affine or has_gcps
 
 
 def read_geotiff(path: Union[str, Path]) -> Tuple[np.ndarray, GeoMetadata]:
@@ -86,9 +93,17 @@ def read_geotiff(path: Union[str, Path]) -> Tuple[np.ndarray, GeoMetadata]:
 
         # Extract CRS with graceful handling
         crs = src.crs
-        if crs is None:
+
+        # Extract GCPs (used by Sentinel-1 SAFE format)
+        gcps = None
+        gcps_crs = None
+        if src.gcps[0]:  # gcps returns (gcps_list, crs)
+            gcps, gcps_crs = src.gcps
+
+        # Warn only if no CRS AND no GCPs
+        if crs is None and gcps is None:
             warnings.warn(
-                f"No CRS found in '{path.name}'. "
+                f"No CRS or GCPs found in '{path.name}'. "
                 "Output will not be georeferenced.",
                 UserWarning
             )
@@ -103,7 +118,9 @@ def read_geotiff(path: Union[str, Path]) -> Tuple[np.ndarray, GeoMetadata]:
             width=src.width,
             height=src.height,
             tags=dict(src.tags()),
-            descriptions=src.descriptions if any(src.descriptions) else None
+            descriptions=src.descriptions if any(src.descriptions) else None,
+            gcps=gcps,
+            gcps_crs=gcps_crs,
         )
 
     # For single-band images, squeeze to 2D
@@ -143,8 +160,9 @@ def write_geotiff(
 
     height, width = data.shape[1], data.shape[2]
 
-    # Warn if no CRS
-    if metadata.crs is None:
+    # Warn if no CRS and no GCPs
+    has_gcps = metadata.gcps is not None and len(metadata.gcps) > 0
+    if metadata.crs is None and not has_gcps:
         warnings.warn(
             f"No CRS in metadata. Output '{path.name}' will not be georeferenced.",
             UserWarning
@@ -179,6 +197,10 @@ def write_geotiff(
             for i, desc in enumerate(metadata.descriptions[:count], start=1):
                 if desc:
                     dst.set_band_description(i, desc)
+
+        # Write GCPs if present (Sentinel-1 SAFE format)
+        if metadata.gcps is not None and len(metadata.gcps) > 0:
+            dst.gcps = (metadata.gcps, metadata.gcps_crs)
 
 
 def create_nodata_mask(

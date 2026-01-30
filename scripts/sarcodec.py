@@ -248,6 +248,17 @@ def serialize_geo_metadata(metadata: GeoMetadata) -> Dict:
     else:
         result["transform"] = None
 
+    # Serialize GCPs if present (Sentinel-1 SAFE format)
+    if metadata.gcps is not None and len(metadata.gcps) > 0:
+        result["gcps"] = [
+            {"col": g.col, "row": g.row, "x": g.x, "y": g.y, "z": g.z, "id": g.id}
+            for g in metadata.gcps
+        ]
+        result["gcps_crs_wkt"] = metadata.gcps_crs.to_wkt() if metadata.gcps_crs else None
+    else:
+        result["gcps"] = None
+        result["gcps_crs_wkt"] = None
+
     return result
 
 
@@ -255,6 +266,7 @@ def deserialize_geo_metadata(data: Dict) -> GeoMetadata:
     """Deserialize JSON dict to GeoMetadata."""
     from rasterio.crs import CRS
     from rasterio.transform import Affine
+    from rasterio.control import GroundControlPoint
 
     # Deserialize CRS
     crs = None
@@ -266,6 +278,21 @@ def deserialize_geo_metadata(data: Dict) -> GeoMetadata:
     if data.get("transform"):
         transform = Affine(*data["transform"])
 
+    # Deserialize GCPs (Sentinel-1 SAFE format)
+    gcps = None
+    gcps_crs = None
+    if data.get("gcps"):
+        gcps = [
+            GroundControlPoint(
+                row=g["row"], col=g["col"],
+                x=g["x"], y=g["y"], z=g.get("z", 0),
+                id=g.get("id", "")
+            )
+            for g in data["gcps"]
+        ]
+        if data.get("gcps_crs_wkt"):
+            gcps_crs = CRS.from_wkt(data["gcps_crs_wkt"])
+
     return GeoMetadata(
         crs=crs,
         transform=transform,
@@ -276,6 +303,8 @@ def deserialize_geo_metadata(data: Dict) -> GeoMetadata:
         height=data.get("height", 0),
         tags=data.get("tags", {}),
         descriptions=tuple(data["descriptions"]) if data.get("descriptions") else None,
+        gcps=gcps,
+        gcps_crs=gcps_crs,
     )
 
 
