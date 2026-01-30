@@ -14,11 +14,22 @@ This study compares CNN-based autoencoder compression against JPEG-2000 for Sent
 
 **ResNet consistently outperforms Baseline** with all improvements being statistically significant (p < 0.001).
 
+### Updated Key Finding (Phase 6.1): Fair Bitrate Comparison
+
+| Comparison | Methodology | ResNet 16x vs JPEG-2000 |
+|------------|-------------|-------------------------|
+| Phase 6 (Original) | Compression ratio match | JPEG-2000 +10 dB PSNR |
+| **Phase 6.1 (Fair)** | **Matched BPP (0.44)** | **JPEG-2000 +1.33 dB PSNR, ResNet +0.040 SSIM** |
+
+**At matched bitrates, ResNet is competitive:** Only 1.3-3.2 dB below JPEG-2000 on PSNR, and **beats JPEG-2000 on SSIM** at high compression (16x). See [Updated Analysis](#updated-analysis-bitrate-matched-comparison-phase-61) for full details.
+
 ### Recommendations
 
 - **Quality-critical applications:** ResNet 4x (24.95 dB, 0.907 SSIM)
 - **Balanced compression:** ResNet 8x (23.13 dB, 0.857 SSIM)
 - **Maximum compression:** ResNet 16x (20.52 dB, 0.754 SSIM)
+- **Perceptual quality at high compression:** ResNet 16x outperforms JPEG-2000 on SSIM (+0.040 at 0.44 BPP)
+- **Future work:** Add entropy coding to autoencoder pipeline to close remaining PSNR gap
 
 ---
 
@@ -608,3 +619,130 @@ The JPEG-2000 results (53 dB PSNR at 4x) appear superior but this is misleading:
 - **For SAR analysis requiring float32 precision:** Use autoencoder compression (ResNet 4x recommended)
 - **For visualization-only applications:** JPEG-2000 may be acceptable after 8-bit quantization
 - **For maximum compression with quality:** ResNet 8x provides good balance (23.1 dB, 0.857 SSIM)
+
+---
+
+## Updated Analysis: Bitrate-Matched Comparison (Phase 6.1)
+
+### Why the Original Comparison Was Unfair
+
+The Phase 6 comparison above compared autoencoders and JPEG-2000 using "compression ratio" as the matching criterion. However, this creates an apples-to-oranges comparison:
+
+- **Autoencoders:** "16x compression" = geometric latent reduction (256x256x1 -> 16x16x16 latent)
+- **JPEG-2000:** "16x compression" = actual file size ratio with entropy coding
+
+This is fundamentally unfair because:
+
+1. **Geometric ratio ignores latent redundancy:** Autoencoders don't use entropy coding, so the latent may have significant redundancy that could be further compressed
+2. **JPEG-2000's ratio includes entropy coding:** The "16x" JPEG-2000 result includes sophisticated arithmetic coding that removes statistical redundancy
+3. **Different BPP at same "ratio":** At "16x compression," JPEG-2000 uses ~2 BPP while the autoencoder's geometric BPP is also ~2, but the autoencoder latent contains more redundant information
+
+**The correct comparison is at matched bits-per-pixel (BPP)** - the actual storage cost.
+
+### Methodology: Entropy-Based Bitrate Calculation
+
+To enable fair comparison, we calculate the **actual bits-per-pixel (BPP)** for autoencoder latents using Shannon entropy estimation:
+
+1. **Quantize latent** to 8-bit (256 levels) per channel using per-channel min/max normalization
+2. **Estimate Shannon entropy** of each channel's quantized distribution using histogram binning
+3. **Sum channel entropies** to get total entropy bits for the latent
+4. **Include overhead** for storing quantization parameters (64 bits per channel for min/max float32 values)
+5. **Calculate BPP** = (total_entropy_bits + overhead_bits) / input_pixels
+
+This gives the theoretical minimum bits needed to losslessly code the quantized latent - the standard metric used in learned image compression literature (Balle et al., 2018; Minnen et al., 2018).
+
+**Formula:**
+```
+BPP = (sum(H_c * latent_pixels) + 64 * n_channels) / (input_height * input_width)
+
+where H_c = Shannon entropy of channel c in bits/symbol
+```
+
+### Entropy-Based BPP vs Geometric BPP
+
+| Model | Geometric BPP | Actual BPP | Reduction |
+|-------|---------------|------------|-----------|
+| ResNet 4x | 2.00 | 1.53 | 23% |
+| ResNet 8x | 1.00 | 0.89 | 11% |
+| ResNet 16x | 0.50 | 0.44 | 12% |
+| Baseline 4x | 2.00 | 1.77 | 12% |
+| Baseline 8x | 1.00 | 0.88 | 12% |
+| Baseline 16x | 0.50 | 0.44 | 12% |
+
+**Key insight:** ResNet 4x shows 23% reduction from geometric to actual BPP, indicating its latent has more exploitable redundancy. This suggests ResNet learns more compressible representations.
+
+### Bitrate-Matched Results
+
+Using the JPEG-2000 rate-distortion curve (23 quality points from 0.03 to 6.4 BPP), we interpolate JPEG-2000 quality at each autoencoder's actual BPP:
+
+| Model | Actual BPP | AE PSNR | AE SSIM | JP2 PSNR @ BPP | JP2 SSIM @ BPP | PSNR Diff | SSIM Diff |
+|-------|------------|---------|---------|----------------|----------------|-----------|-----------|
+| **ResNet 16x** | 0.44 | 21.20 | 0.740 | 22.53 | 0.700 | **-1.33 dB** | **+0.040** |
+| ResNet 8x | 0.89 | 23.78 | 0.847 | 25.19 | 0.847 | -1.42 dB | -0.001 |
+| ResNet 4x | 1.53 | 25.56 | 0.899 | 28.77 | 0.934 | -3.22 dB | -0.035 |
+| Baseline 16x | 0.44 | 19.43 | 0.586 | 22.52 | 0.699 | -3.10 dB | -0.114 |
+| Baseline 8x | 0.88 | 21.67 | 0.686 | 25.17 | 0.847 | -3.50 dB | -0.160 |
+| Baseline 4x | 1.77 | 24.78 | 0.856 | 30.20 | 0.953 | -5.42 dB | -0.097 |
+
+### Rate-Distortion Curves: Fair Comparison
+
+The following figures show JPEG-2000's full R-D curve with autoencoder points plotted at their actual entropy-estimated BPP:
+
+![PSNR Rate-Distortion (Bitrate-Matched)](bitrate_matched/figures/rd_curve_bitrate_matched_psnr.png)
+
+![SSIM Rate-Distortion (Bitrate-Matched)](bitrate_matched/figures/rd_curve_bitrate_matched_ssim.png)
+
+### Key Findings from Bitrate-Matched Comparison
+
+**1. ResNet is competitive with JPEG-2000 at high compression:**
+- ResNet 16x is only **1.33 dB below JPEG-2000** at the same 0.44 BPP
+- ResNet 8x is only **1.42 dB below JPEG-2000** at 0.89 BPP
+- The gap narrows significantly at lower bitrates
+
+**2. ResNet 16x actually beats JPEG-2000 on SSIM:**
+- At 0.44 BPP, ResNet 16x achieves SSIM 0.740 vs JPEG-2000's 0.699
+- This **+0.040 SSIM advantage** suggests autoencoders preserve perceptual structure better at high compression
+
+**3. ResNet significantly outperforms Baseline at all ratios:**
+- The architecture improvement from Phase 4 translates to 1.8-2.2 dB better performance at matched BPP
+- Baseline models are 3.1-5.4 dB below JPEG-2000; ResNet models are only 1.3-3.2 dB below
+
+**4. The gap is much smaller than Phase 6 suggested:**
+- Phase 6's unfair comparison showed 10-28 dB gaps (due to 8-bit vs float32 input)
+- Fair comparison shows only 1.3-5.4 dB gaps
+- ResNet's actual deficit vs JPEG-2000 is **5-10x smaller** than the unfair comparison suggested
+
+### Revised Conclusions
+
+The Phase 6 conclusion that "JPEG-2000 comparison is unfair" is now addressed with proper bitrate-matched methodology:
+
+**1. Fair comparison confirms:** JPEG-2000 still outperforms autoencoders on PSNR at matched bitrates, but the gap is much smaller than the unfair comparison suggested. JPEG-2000 is a mature, highly optimized codec with 20+ years of development.
+
+**2. Autoencoder advantages:**
+- **SSIM at high compression:** ResNet 16x beats JPEG-2000 on perceptual quality (SSIM +0.040)
+- **Float32 preservation:** Autoencoders work directly with scientific data without quantization loss
+- **Learnable:** Can be fine-tuned for specific SAR characteristics or downstream tasks
+- **Narrowing gap:** At lower bitrates, the PSNR gap shrinks from 3.2 dB (4x) to 1.3 dB (16x)
+
+**3. JPEG-2000 advantages:**
+- **Mature codec:** Decades of optimization, hardware support, wide compatibility
+- **Better PSNR:** 1.3-3.2 dB higher PSNR for ResNet models at matched BPP
+- **Entropy coding built-in:** No separate compression step needed
+
+**4. Recommendation:**
+
+For SAR compression applications:
+- **If perceptual quality at high compression is critical:** ResNet 16x provides better SSIM than JPEG-2000
+- **If PSNR fidelity is paramount:** JPEG-2000 remains the better choice
+- **If float32 precision must be preserved:** Autoencoder approach is necessary (JPEG-2000 requires quantization)
+- **Future work:** Implement entropy coding (arithmetic coding) on autoencoder latents to close the PSNR gap
+
+### Comparison Summary
+
+| Aspect | Phase 6 (Unfair) | Phase 6.1 (Fair) |
+|--------|------------------|------------------|
+| Matching criterion | Compression ratio | Bits-per-pixel (BPP) |
+| PSNR gap (ResNet 16x) | ~10 dB | **1.33 dB** |
+| SSIM gap (ResNet 16x) | ~0.22 | **+0.040** (AE wins) |
+| Input data | AE: float32, JP2: uint8 | Both compared at same BPP |
+| Conclusion | JPEG-2000 vastly superior | JPEG-2000 slightly better PSNR, AE better SSIM at high compression |
