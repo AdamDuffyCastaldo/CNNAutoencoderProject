@@ -38,6 +38,8 @@ Thumbs.db
 *.swp
 *.swo
 node_modules/
+.vscode/
+.planning/
 
 # Build
 build/
@@ -54,3 +56,5 @@ train_cell_41.txt
 train_cell_43.txt
 train_cell_44.txt
 notebooks/test_files/
+package.json
+package-lock.json
