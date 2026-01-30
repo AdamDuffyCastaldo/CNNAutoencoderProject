@@ -403,10 +403,12 @@ Even with 8-bit I/O quantization, JPEG-2000 vastly outperforms autoencoders (31 
 
 **Plans:** 3 plans
 
+**Status:** Complete
+
 Plans:
-- [ ] 06.1-01-PLAN.md - Entropy-based bitrate calculation module (quantization, entropy, BPP)
-- [ ] 06.1-02-PLAN.md - Bitrate-matched evaluation script and R-D curves
-- [ ] 06.1-03-PLAN.md - Update final report with fair comparison results
+- [x] 06.1-01-PLAN.md - Entropy-based bitrate calculation module (quantization, entropy, BPP)
+- [x] 06.1-02-PLAN.md - Bitrate-matched evaluation script and R-D curves
+- [x] 06.1-03-PLAN.md - Update final report with fair comparison results
 
 ### Success Criteria
 
@@ -488,7 +490,7 @@ Plans:
 | 4 - Architecture Enhancement | Complete | 5/5 (ResNet b=64 selected) |
 | 5 - Full Image Inference | Complete | 7/7 |
 | 6 - Final Experiments | Complete | 6/6 (ResNet outperforms Baseline) |
-| 6.1 - Fair Bitrate Comparison | Not Started | 0/5 (INSERTED) |
+| 6.1 - Fair Bitrate Comparison | Complete | 5/5 (ResNet within 1.3 dB of JPEG-2000) |
 | 7 - Deployment | Not Started | 0/6 |
 
 ---
