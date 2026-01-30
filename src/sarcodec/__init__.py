@@ -21,8 +21,16 @@ CLI usage:
 For more information, see: https://github.com/username/sarcodec
 """
 
+import sys
+from pathlib import Path
+
 __version__ = "1.0.0"
 __author__ = "SAR Codec Authors"
+
+# Ensure project root is in path for both installed and development modes
+_project_root = Path(__file__).parent.parent.parent
+if _project_root.exists() and str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 # Re-export main classes
 from src.inference.compressor import SARCompressor
