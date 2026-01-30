@@ -58,3 +58,13 @@ train_cell_44.txt
 notebooks/test_files/
 package.json
 package-lock.json
+
+# Old evaluation results (kept locally)
+results/eval_*/
+
+# Test outputs (local testing)
+test_cli_output.npz
+test_reconstructed.tiff
+
+# ONNX models (exported, not tracked)
+models/

@@ -181,6 +181,8 @@ Command-line tools for training, evaluation, and deployment.
 | `download_sentinel_data.py` | Download Sentinel-1 data (placeholder) |
 | `quick_train_attention.py` | Quick attention model training |
 | `docker-entrypoint.sh` | Docker container entrypoint |
+| `check_georef.py` | Verify GeoTIFF georeferencing preservation |
+| `test_api.py` | Test REST API endpoints |
 
 ---
 
