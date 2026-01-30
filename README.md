@@ -29,11 +29,20 @@ pip install -e ".[full]"
 ### Command Line
 
 ```bash
-# Compress a GeoTIFF
-sarcodec compress input.tif output.npz --checkpoint notebooks/checkpoints/resnet_c64_b64_cr4x_*/best.pth
+# Compress a GeoTIFF (uses default 8x compression)
+sarcodec compress input.tif -o output.npz
+
+# Compress with specific compression ratio (4x = best quality, 16x = smallest)
+sarcodec compress input.tif -o output.npz -c 4x
+
+# Compress with custom model checkpoint
+sarcodec compress input.tif -o output.npz --model notebooks/checkpoints/resnet_c64_b64_cr4x_*/best.pth
 
 # Decompress back to GeoTIFF
-sarcodec decompress output.npz reconstructed.tif
+sarcodec decompress output.npz -o reconstructed.tif
+
+# Decompress as Cloud Optimized GeoTIFF
+sarcodec decompress output.npz -o reconstructed.tif --cog
 ```
 
 ### Python API

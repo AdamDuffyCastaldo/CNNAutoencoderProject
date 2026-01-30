@@ -55,6 +55,7 @@ from src.inference.geotiff import (
     write_cog,
     create_nodata_mask,
     apply_nodata_mask,
+    warp_with_gcps,
 )
 
 # Version info
@@ -168,7 +169,9 @@ Examples:
   sarcodec compress image.tif                    Compress with default (8x)
   sarcodec compress image.tif -c 4x              Compress with 4x (best quality)
   sarcodec compress image.tif -c 16x             Compress with 16x (smallest size)
+  sarcodec compress image.tif -d output/         Output to output/image/compressed.npz
   sarcodec decompress data.npz                   Decompress (auto-detects model)
+  sarcodec decompress data.npz -d output/        Output to output/data/reconstructed.tif
   sarcodec decompress data.npz --cog             Output as Cloud Optimized GeoTIFF
   sarcodec --version                             Show available presets
         """
@@ -197,6 +200,10 @@ Examples:
     compress_parser.add_argument(
         "-o", "--output",
         help="Output NPZ file path (default: input name with .npz extension)"
+    )
+    compress_parser.add_argument(
+        "-d", "--output-dir",
+        help="Output directory (creates subfolders per input file)"
     )
     compress_parser.add_argument(
         "-c", "--compression",
@@ -238,6 +245,10 @@ Examples:
         help="Output GeoTIFF file path (default: input name with .tif extension)"
     )
     decompress_parser.add_argument(
+        "-d", "--output-dir",
+        help="Output directory (creates subfolders per input file)"
+    )
+    decompress_parser.add_argument(
         "--model",
         default=None,
         help="Model checkpoint path (default: auto-detect from NPZ metadata)"
@@ -252,6 +263,11 @@ Examples:
         "--cog",
         action="store_true",
         help="Output as Cloud Optimized GeoTIFF"
+    )
+    decompress_parser.add_argument(
+        "--warp-gcps",
+        action="store_true",
+        help="Warp output using GCPs for accurate georeferencing (Sentinel-1)"
     )
 
     return parser
@@ -481,7 +497,8 @@ def decompress_file(
     compressor: SARCompressor,
     progress: Progress,
     tiff_compress: str = "lzw",
-    use_cog: bool = False
+    use_cog: bool = False,
+    warp_gcps: bool = False
 ) -> Dict:
     """
     Decompress a single NPZ file.
@@ -563,6 +580,39 @@ def decompress_file(
     progress.update(task_write, completed=1, total=1)
     progress.remove_task(task_write)
 
+    # Apply GCP warping if requested and GCPs are present
+    warped = False
+    if warp_gcps and geo_metadata.gcps and len(geo_metadata.gcps) > 0:
+        task_warp = progress.add_task(
+            f"[magenta]Warping with GCPs...",
+            total=100
+        )
+
+        # Warp in place (overwrite the output file)
+        temp_path = output_path.with_name(output_path.stem + '_prewarp.tif')
+
+        # Clean up any existing temp files
+        if temp_path.exists():
+            temp_path.unlink()
+
+        output_path.rename(temp_path)
+
+        def warp_progress(current, total):
+            progress.update(task_warp, completed=current, total=total)
+
+        try:
+            warp_with_gcps(temp_path, output_path, progress_callback=warp_progress)
+            temp_path.unlink()  # Remove temp file on success
+            warped = True
+        except Exception as e:
+            # Restore original file on failure
+            if not output_path.exists() and temp_path.exists():
+                temp_path.rename(output_path)
+            raise
+
+        progress.update(task_warp, completed=100, total=100)
+        progress.remove_task(task_warp)
+
     output_size = output_path.stat().st_size
 
     return {
@@ -572,6 +622,7 @@ def decompress_file(
         "time_seconds": decompress_time,
         "output_shape": reconstructed.shape,
         "is_cog": use_cog,
+        "warped_gcps": warped,
     }
 
 
@@ -632,7 +683,12 @@ def compress_command(args: argparse.Namespace) -> int:
     ) as progress:
         for i, input_file in enumerate(input_files):
             # Determine output path
-            if args.output and len(input_files) == 1:
+            if args.output_dir:
+                # Create organized subfolder structure
+                output_dir = Path(args.output_dir) / input_file.stem
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_path = output_dir / "compressed.npz"
+            elif args.output and len(input_files) == 1:
                 output_path = args.output
             else:
                 output_path = input_file.with_suffix(".npz")
@@ -752,7 +808,12 @@ def decompress_command(args: argparse.Namespace) -> int:
     ) as progress:
         for i, input_file in enumerate(input_files):
             # Determine output path
-            if args.output and len(input_files) == 1:
+            if args.output_dir:
+                # Create organized subfolder structure
+                output_dir = Path(args.output_dir) / input_file.stem
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_path = output_dir / "reconstructed.tif"
+            elif args.output and len(input_files) == 1:
                 output_path = args.output
             else:
                 output_path = input_file.with_suffix(".tif")
@@ -778,15 +839,21 @@ def decompress_command(args: argparse.Namespace) -> int:
                     compressor,
                     progress,
                     tiff_compress=args.tiff_compress,
-                    use_cog=args.cog
+                    use_cog=args.cog,
+                    warp_gcps=args.warp_gcps
                 )
                 results.append(stats)
 
                 # Print summary for this file
-                cog_note = " (COG)" if stats["is_cog"] else ""
+                notes = []
+                if stats["is_cog"]:
+                    notes.append("COG")
+                if stats.get("warped_gcps"):
+                    notes.append("GCP-warped")
+                note_str = f" ({', '.join(notes)})" if notes else ""
                 console.print(
                     f"[green]Decompressed:[/green] {input_file.name} -> "
-                    f"{Path(output_path).name}{cog_note} "
+                    f"{Path(output_path).name}{note_str} "
                     f"({stats['time_seconds']:.1f}s)"
                 )
 

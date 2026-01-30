@@ -240,8 +240,10 @@ class SARCompressor:
         n_batches = (n_tiles + self.batch_size - 1) // self.batch_size
 
         with torch.inference_mode():
-            # Use AMP on CUDA for faster inference
-            use_amp = self.device.type == 'cuda'
+            # Use AMP on CUDA for faster inference, BUT only for decoding
+            # Encoding uses raw SAR values which can be very large (1000-3000+)
+            # and cause float16 overflow, resulting in NaN values
+            use_amp = self.device.type == 'cuda' and not encode
 
             for batch_idx in range(n_batches):
                 start = batch_idx * self.batch_size

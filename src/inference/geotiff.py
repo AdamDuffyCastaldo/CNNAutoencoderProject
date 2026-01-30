@@ -20,7 +20,8 @@ from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 import rasterio
 from rasterio.crs import CRS
-from rasterio.transform import Affine
+from rasterio.transform import Affine, from_gcps, from_bounds
+from scipy.interpolate import RBFInterpolator
 
 
 @dataclass
@@ -357,6 +358,182 @@ def write_cog(
 def is_cog_available() -> bool:
     """Check if COG support is available."""
     return _COG_AVAILABLE
+
+
+def warp_with_gcps(
+    input_path: Union[str, Path],
+    output_path: Union[str, Path],
+    resolution: Optional[float] = None,
+    progress_callback: Optional[callable] = None
+) -> None:
+    """
+    Warp a GeoTIFF using GCPs with thin-plate spline interpolation.
+
+    Uses coarse grid + bilinear upsampling for speed while maintaining accuracy.
+
+    Args:
+        input_path: Path to input GeoTIFF with GCPs
+        output_path: Path to output warped GeoTIFF
+        resolution: Output resolution in CRS units (default: derive from GCPs)
+        progress_callback: Optional callback(current, total) for progress
+
+    Raises:
+        ValueError: If input has no GCPs
+    """
+    from scipy.ndimage import map_coordinates
+    from scipy.interpolate import RegularGridInterpolator
+
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+
+    if progress_callback:
+        progress_callback(0, 100)
+
+    with rasterio.open(input_path) as src:
+        gcps, gcps_crs = src.gcps
+
+        if not gcps:
+            raise ValueError(f"No GCPs found in {input_path}")
+
+        data = src.read(1)
+        height, width = data.shape
+        nodata = src.nodata
+
+        if progress_callback:
+            progress_callback(5, 100)
+
+        # Build RBF interpolators from GCPs
+        pixel_coords = np.array([[g.col, g.row] for g in gcps])
+        geo_coords = np.array([[g.x, g.y] for g in gcps])
+
+        inv_col = RBFInterpolator(geo_coords, pixel_coords[:, 0], kernel='thin_plate_spline')
+        inv_row = RBFInterpolator(geo_coords, pixel_coords[:, 1], kernel='thin_plate_spline')
+
+        if progress_callback:
+            progress_callback(10, 100)
+
+        # Calculate output bounds
+        min_x, min_y = geo_coords.min(axis=0)
+        max_x, max_y = geo_coords.max(axis=0)
+
+        if resolution is None:
+            affine_approx = from_gcps(gcps)
+            resolution = abs(affine_approx.a)
+
+        out_width = int(np.ceil((max_x - min_x) / resolution))
+        out_height = int(np.ceil((max_y - min_y) / resolution))
+        out_transform = from_bounds(min_x, min_y, max_x, max_y, out_width, out_height)
+
+        if progress_callback:
+            progress_callback(15, 100)
+
+        # OPTIMIZATION: Compute RBF on coarse grid, then interpolate per-chunk
+        coarse_step = 64
+        coarse_h = (out_height + coarse_step - 1) // coarse_step + 1
+        coarse_w = (out_width + coarse_step - 1) // coarse_step + 1
+
+        coarse_rows = np.linspace(0, out_height - 1, coarse_h)
+        coarse_cols = np.linspace(0, out_width - 1, coarse_w)
+        coarse_cols_grid, coarse_rows_grid = np.meshgrid(coarse_cols, coarse_rows)
+
+        coarse_xs = min_x + (coarse_cols_grid + 0.5) * resolution
+        coarse_ys = max_y - (coarse_rows_grid + 0.5) * resolution
+        coarse_coords = np.column_stack([coarse_xs.ravel(), coarse_ys.ravel()])
+
+        if progress_callback:
+            progress_callback(20, 100)
+
+        coarse_src_cols = inv_col(coarse_coords).reshape(coarse_h, coarse_w)
+
+        if progress_callback:
+            progress_callback(35, 100)
+
+        coarse_src_rows = inv_row(coarse_coords).reshape(coarse_h, coarse_w)
+
+        if progress_callback:
+            progress_callback(50, 100)
+
+        # Create interpolators for the coarse grid
+        col_interp = RegularGridInterpolator(
+            (coarse_rows, coarse_cols), coarse_src_cols,
+            method='linear', bounds_error=False, fill_value=-1
+        )
+        row_interp = RegularGridInterpolator(
+            (coarse_rows, coarse_cols), coarse_src_rows,
+            method='linear', bounds_error=False, fill_value=-1
+        )
+
+        # Process in chunks to avoid memory issues
+        chunk_size = 2048  # rows per chunk
+        output = np.zeros((out_height, out_width), dtype=data.dtype)
+        n_chunks = (out_height + chunk_size - 1) // chunk_size
+
+        for chunk_idx in range(n_chunks):
+            row_start = chunk_idx * chunk_size
+            row_end = min(row_start + chunk_size, out_height)
+            chunk_h = row_end - row_start
+
+            if progress_callback:
+                progress_callback(50 + int(40 * chunk_idx / n_chunks), 100)
+
+            # Generate coordinates for this chunk
+            chunk_rows = np.arange(row_start, row_end)
+            chunk_cols = np.arange(out_width)
+            cols_grid, rows_grid = np.meshgrid(chunk_cols, chunk_rows)
+            points = np.column_stack([rows_grid.ravel(), cols_grid.ravel()])
+
+            # Interpolate source coordinates
+            src_cols = col_interp(points).reshape(chunk_h, out_width)
+            src_rows = row_interp(points).reshape(chunk_h, out_width)
+
+            # Bilinear resampling
+            src_cols_int = np.clip(src_cols.astype(np.int32), 0, width - 2)
+            src_rows_int = np.clip(src_rows.astype(np.int32), 0, height - 2)
+            col_frac = np.clip(src_cols - src_cols_int, 0, 1).astype(np.float32)
+            row_frac = np.clip(src_rows - src_rows_int, 0, 1).astype(np.float32)
+
+            valid = (src_cols >= 0) & (src_cols < width - 1) & \
+                    (src_rows >= 0) & (src_rows < height - 1)
+
+            v00 = data[src_rows_int, src_cols_int]
+            v01 = data[src_rows_int, src_cols_int + 1]
+            v10 = data[src_rows_int + 1, src_cols_int]
+            v11 = data[src_rows_int + 1, src_cols_int + 1]
+
+            chunk_out = (v00 * (1 - col_frac) * (1 - row_frac) +
+                         v01 * col_frac * (1 - row_frac) +
+                         v10 * (1 - col_frac) * row_frac +
+                         v11 * col_frac * row_frac)
+
+            if nodata is not None:
+                chunk_out[~valid] = nodata
+            else:
+                chunk_out[~valid] = 0
+
+            output[row_start:row_end, :] = chunk_out
+
+        if progress_callback:
+            progress_callback(90, 100)
+
+        # Write output
+        profile = {
+            'driver': 'GTiff',
+            'dtype': output.dtype,
+            'width': out_width,
+            'height': out_height,
+            'count': 1,
+            'crs': gcps_crs,
+            'transform': out_transform,
+            'nodata': nodata,
+            'compress': 'lzw',
+        }
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with rasterio.open(output_path, 'w', **profile) as dst:
+            dst.write(output, 1)
+
+        if progress_callback:
+            progress_callback(100, 100)
 
 
 def test_geotiff_io():

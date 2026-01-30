@@ -1,0 +1,21 @@
+{
+  "latent_channels": 32,
+  "base_channels": 64,
+  "vmin": 14.768798828125,
+  "vmax": 24.540729522705078,
+  "noise_floor": 1e-10,
+  "input_shape": [
+    1,
+    1,
+    256,
+    256
+  ],
+  "export_date": "2026-01-30T20:21:03.440343",
+  "pytorch_version": "2.5.1+cu121",
+  "onnx_opset": 17,
+  "source_checkpoint": "notebooks/checkpoints/resnet_c32_b64_cr8x_20260128_213848/best.pth",
+  "checksums": {
+    "encoder_sha256": "d1120d6355a78ca900b17c09a2d4bdb1486389725e75a50ac5e4064ae5cbc0a4",
+    "decoder_sha256": "957bef944a5cfdadb2ffc33e1157a607532f360e70ca93ea4ff3d2f5f4a7b723"
+  }
+}
