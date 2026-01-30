@@ -430,18 +430,27 @@ Plans:
 
 ## Phase 7: Deployment
 
-**Goal:** Package the best-performing model for production deployment with multiple export formats, containerization, and optional API serving.
+**Goal:** Package the best-performing model for production deployment with ONNX export, Docker containerization, REST API, and PyPI distribution.
 
 **Dependencies:** Phase 6 (Final Experiments)
 
 **Estimated Complexity:** Medium
 
+**Plans:** 5 plans in 3 waves
+
+Plans:
+- [ ] 07-01-PLAN.md - ONNX export infrastructure (wrapper model, export script, validation)
+- [ ] 07-02-PLAN.md - FastAPI REST application (/compress, /decompress, /health endpoints)
+- [ ] 07-03-PLAN.md - Docker containerization (multi-stage build, GPU support, docker-compose)
+- [ ] 07-04-PLAN.md - PyPI package setup (pyproject.toml, entry points, Apache 2.0 license)
+- [ ] 07-05-PLAN.md - Documentation and release preparation (quickstart, deployment guide, API reference)
+
 ### Success Criteria
 
 1. Model exports to ONNX format and runs inference correctly outside PyTorch
-2. TorchScript export works for deployment without Python dependencies
-3. Docker container runs inference on CPU and GPU with single command
-4. REST API endpoint accepts GeoTIFF upload and returns compressed/decompressed result
+2. Docker container runs inference on CPU and GPU with single command
+3. REST API endpoint accepts GeoTIFF upload and returns compressed/decompressed result
+4. Package installable via `pip install sarcodec`
 5. Documentation covers all deployment options with examples
 6. Inference latency meets targets: <1s per patch, <5 min full scene
 
@@ -450,7 +459,6 @@ Plans:
 | ID | Requirement |
 |----|-------------|
 | FR7.1 | Export model to ONNX format |
-| FR7.2 | Export model to TorchScript |
 | FR7.3 | Docker container with GPU support |
 | FR7.4 | REST API for compression/decompression |
 | FR7.5 | Deployment documentation |
@@ -458,25 +466,26 @@ Plans:
 
 ### Deliverables
 
-- `scripts/export_onnx.py` - ONNX export with validation
-- `scripts/export_torchscript.py` - TorchScript export
-- `Dockerfile` and `docker-compose.yml` - Container setup (CPU + GPU variants)
+- `src/export/` - ONNX export module with wrapper and validation
+- `scripts/export_onnx.py` - ONNX export CLI
 - `src/api/` - FastAPI application for REST serving
-- `docs/deployment.md` - Deployment guide with examples
-- Published Docker image (optional: Docker Hub / GitHub Container Registry)
+- `Dockerfile` and `docker-compose.yml` - Container setup with GPU support
+- `pyproject.toml` - PyPI package configuration
+- `src/sarcodec/` - Installable package with CLI entry point
+- `docs/` - Deployment documentation (quickstart.md, deployment.md, api-reference.md)
+- `notebooks/usage_example.ipynb` - Usage demonstration notebook
 
 ### Key Tasks (High-Level)
 
-- [ ] Implement ONNX export with dynamic batch size
-- [ ] Validate ONNX inference matches PyTorch output
-- [ ] Implement TorchScript export (trace or script)
-- [ ] Create Dockerfile with CUDA support
-- [ ] Create docker-compose for easy local deployment
+- [ ] Create ONNX wrapper model with embedded preprocessing
+- [ ] Implement ONNX export with dynamic batch size and validation
 - [ ] Implement FastAPI endpoints: `/compress`, `/decompress`, `/health`
 - [ ] Add file upload/download handling for GeoTIFF
-- [ ] Write deployment documentation
-- [ ] Benchmark inference latency in container
-- [ ] Optional: CI/CD pipeline for automated builds
+- [ ] Create Dockerfile with multi-stage build and CUDA support
+- [ ] Create docker-compose for easy local deployment
+- [ ] Create pyproject.toml with optional dependencies
+- [ ] Write deployment documentation with examples
+- [ ] Create usage example notebook
 
 ---
 
@@ -491,7 +500,7 @@ Plans:
 | 5 - Full Image Inference | Complete | 7/7 |
 | 6 - Final Experiments | Complete | 6/6 (ResNet outperforms Baseline) |
 | 6.1 - Fair Bitrate Comparison | Complete | 5/5 (ResNet within 1.3 dB of JPEG-2000) |
-| 7 - Deployment | Not Started | 0/6 |
+| 7 - Deployment | Planned | 0/6 |
 
 ---
 
@@ -550,4 +559,5 @@ The project has an established skeleton with most functionality as stubs (`NotIm
 *Phase 6 complete: 2026-01-29 (ResNet outperforms Baseline at all ratios)*
 *Phase 6.1 inserted: 2026-01-29 (Fair bitrate comparison - urgent)*
 *Phase 6.1 planned: 2026-01-29 (3 plans in 3 waves)*
+*Phase 7 planned: 2026-01-30 (5 plans in 3 waves)*
 *Derived from: PROJECT.md, REQUIREMENTS.md, research/SUMMARY.md*
