@@ -1,0 +1,70 @@
+# Docker Compose for SAR Codec
+# Usage: docker compose up (starts API server with GPU)
+
+services:
+  sarcodec:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sarcodec:latest
+    container_name: sarcodec-api
+
+    # API server mode
+    command: ["--serve"]
+
+    # Port mapping
+    ports:
+      - "${SARCODEC_PORT:-8000}:8000"
+
+    # Volume mounts
+    volumes:
+      # Mount models directory (required)
+      - ./notebooks/checkpoints:/app/models:ro
+      # Optional: mount data for CLI usage
+      - ./data:/data
+
+    # Environment
+    environment:
+      - SARCODEC_CHECKPOINT_DIR=/app/models
+      - SARCODEC_HOST=0.0.0.0
+      - SARCODEC_PORT=8000
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+
+    # GPU support (requires nvidia-container-toolkit)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    # Increase shared memory for PyTorch
+    shm_size: '2g'
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Health check (optional - disabled per CONTEXT.md)
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+
+  # Optional: CPU-only service for testing without GPU
+  sarcodec-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sarcodec:latest
+    container_name: sarcodec-api-cpu
+    profiles:
+      - cpu-only  # Only starts with: docker compose --profile cpu-only up
+    command: ["--serve"]
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./notebooks/checkpoints:/app/models:ro
+    environment:
+      - CUDA_VISIBLE_DEVICES=""  # Disable GPU
