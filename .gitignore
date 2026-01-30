@@ -66,5 +66,11 @@ results/eval_*/
 test_cli_output.npz
 test_reconstructed.tiff
 
+# Personal reference docs
+CLI_REFERENCE.md
+
 # ONNX models (exported, not tracked)
 models/
+compressed_e63d.npz
+reconstructed_e63d_with_georef.tiff
+test_no_cog.tiff

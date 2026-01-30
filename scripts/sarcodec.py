@@ -67,10 +67,49 @@ EXIT_MODEL_ERROR = 2
 EXIT_OOM_ERROR = 3
 EXIT_GENERAL_ERROR = 4
 
-# Default paths
-DEFAULT_MODEL_PATH = str(
-    PROJECT_ROOT / "notebooks" / "checkpoints" / "resnet_lite_v2_c16" / "best.pth"
-)
+# Model presets - best performing checkpoints for each compression ratio
+MODEL_PRESETS = {
+    "4x": "resnet_c64_b64_cr4x_20260129_141535",
+    "8x": "resnet_c32_b64_cr8x_20260128_213848",
+    "16x": "resnet_c16_b64_cr16x_20260128_003926",
+}
+
+# Default compression ratio
+DEFAULT_COMPRESSION = "8x"
+
+
+def find_model_path(preset_or_path: str) -> str:
+    """
+    Resolve a model preset (4x, 8x, 16x) or path to a full checkpoint path.
+
+    Args:
+        preset_or_path: Either a preset name like "4x" or a path to checkpoint
+
+    Returns:
+        Full path to the best.pth checkpoint file
+    """
+    # Check if it's a preset
+    if preset_or_path in MODEL_PRESETS:
+        checkpoint_dir = PROJECT_ROOT / "notebooks" / "checkpoints" / MODEL_PRESETS[preset_or_path]
+        checkpoint_path = checkpoint_dir / "best.pth"
+        if checkpoint_path.exists():
+            return str(checkpoint_path)
+        raise FileNotFoundError(f"Preset '{preset_or_path}' checkpoint not found: {checkpoint_path}")
+
+    # Check if it's already a valid path
+    path = Path(preset_or_path)
+    if path.exists():
+        return str(path)
+
+    # Try as a checkpoint directory name
+    checkpoint_dir = PROJECT_ROOT / "notebooks" / "checkpoints" / preset_or_path
+    if checkpoint_dir.exists():
+        checkpoint_path = checkpoint_dir / "best.pth"
+        if checkpoint_path.exists():
+            return str(checkpoint_path)
+
+    raise FileNotFoundError(f"Model not found: {preset_or_path}")
+
 
 # Console for rich output
 console = Console()
@@ -86,23 +125,22 @@ def get_checkpoint_hash(model_path: str, bytes_to_read: int = 1024) -> str:
         return "unknown"
 
 
-def show_version(model_path: str) -> None:
+def show_version() -> None:
     """Print version information."""
     import torch
 
     console.print(f"[bold]sarcodec[/bold] version {__version__}")
     console.print()
 
-    # Model info
-    console.print("[bold]Model:[/bold]")
-    if os.path.exists(model_path):
-        checkpoint_hash = get_checkpoint_hash(model_path)
-        file_size_mb = os.path.getsize(model_path) / (1024 * 1024)
-        console.print(f"  Path: {model_path}")
-        console.print(f"  Size: {file_size_mb:.2f} MB")
-        console.print(f"  Hash: {checkpoint_hash}")
-    else:
-        console.print(f"  Path: {model_path} [red](not found)[/red]")
+    # Available presets
+    console.print("[bold]Compression Presets:[/bold]")
+    for preset, checkpoint_name in MODEL_PRESETS.items():
+        try:
+            model_path = find_model_path(preset)
+            status = "[green]available[/green]"
+        except FileNotFoundError:
+            status = "[red]not found[/red]"
+        console.print(f"  {preset:4s} -> {checkpoint_name} ({status})")
 
     console.print()
 
@@ -127,12 +165,12 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  sarcodec compress image.tif                    Compress to image.npz
-  sarcodec compress image.tif -o out.npz         Compress with custom output name
-  sarcodec compress *.tif                        Batch compress multiple files
-  sarcodec decompress data.npz                   Decompress to data.tif
+  sarcodec compress image.tif                    Compress with default (8x)
+  sarcodec compress image.tif -c 4x              Compress with 4x (best quality)
+  sarcodec compress image.tif -c 16x             Compress with 16x (smallest size)
+  sarcodec decompress data.npz                   Decompress (auto-detects model)
   sarcodec decompress data.npz --cog             Output as Cloud Optimized GeoTIFF
-  sarcodec --version                             Show version and model info
+  sarcodec --version                             Show available presets
         """
     )
 
@@ -161,9 +199,15 @@ Examples:
         help="Output NPZ file path (default: input name with .npz extension)"
     )
     compress_parser.add_argument(
+        "-c", "--compression",
+        choices=["4x", "8x", "16x"],
+        default=DEFAULT_COMPRESSION,
+        help=f"Compression ratio preset (default: {DEFAULT_COMPRESSION})"
+    )
+    compress_parser.add_argument(
         "--model",
-        default=DEFAULT_MODEL_PATH,
-        help=f"Model checkpoint path (default: {DEFAULT_MODEL_PATH})"
+        default=None,
+        help="Custom model checkpoint path (overrides -c)"
     )
     compress_parser.add_argument(
         "--overlap",
@@ -195,8 +239,8 @@ Examples:
     )
     decompress_parser.add_argument(
         "--model",
-        default=DEFAULT_MODEL_PATH,
-        help=f"Model checkpoint path (default: {DEFAULT_MODEL_PATH})"
+        default=None,
+        help="Model checkpoint path (default: auto-detect from NPZ metadata)"
     )
     decompress_parser.add_argument(
         "--tiff-compress",
@@ -312,7 +356,9 @@ def compress_file(
     input_path: str,
     output_path: str,
     compressor: SARCompressor,
-    progress: Progress
+    progress: Progress,
+    model_path: str = None,
+    compression_preset: str = None
 ) -> Dict:
     """
     Compress a single GeoTIFF file.
@@ -374,6 +420,14 @@ def compress_file(
         "original_dtype": str(data.dtype),
         "sarcodec_version": __version__,
     }
+
+    # Store model info for auto-detection during decompression
+    if compression_preset:
+        full_metadata["compression_preset"] = compression_preset
+    if model_path:
+        # Store just the checkpoint directory name for portability
+        model_dir = Path(model_path).parent.name
+        full_metadata["model_checkpoint"] = model_dir
 
     # Include nodata mask if present
     if nodata_mask is not None and nodata_mask.any():
@@ -537,16 +591,23 @@ def compress_command(args: argparse.Namespace) -> int:
         console.print("[red]Error: No input files specified[/red]")
         return EXIT_FILE_ERROR
 
-    # Validate model exists
-    if not os.path.exists(args.model):
-        console.print(f"[red]Error: Model not found: {args.model}[/red]")
-        return EXIT_MODEL_ERROR
+    # Determine model path: --model overrides -c preset
+    compression_preset = None
+    if args.model:
+        model_path = args.model
+    else:
+        compression_preset = args.compression
+        try:
+            model_path = find_model_path(compression_preset)
+        except FileNotFoundError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            return EXIT_MODEL_ERROR
 
     # Load model
     try:
-        console.print(f"[dim]Loading model: {args.model}[/dim]")
+        console.print(f"[dim]Loading model ({compression_preset or 'custom'}): {Path(model_path).parent.name}[/dim]")
         compressor = SARCompressor(
-            model_path=args.model,
+            model_path=model_path,
             overlap=args.overlap,
             batch_size=args.batch_size
         )
@@ -581,7 +642,9 @@ def compress_command(args: argparse.Namespace) -> int:
                     str(input_file),
                     str(output_path),
                     compressor,
-                    progress
+                    progress,
+                    model_path=model_path,
+                    compression_preset=compression_preset
                 )
                 results.append(stats)
 
@@ -620,6 +683,25 @@ def compress_command(args: argparse.Namespace) -> int:
     return EXIT_SUCCESS
 
 
+def get_model_from_npz(npz_path: Path) -> Optional[str]:
+    """Extract model path from NPZ metadata for auto-detection."""
+    try:
+        npz_data = np.load(npz_path, allow_pickle=True)
+        metadata = json.loads(str(npz_data["metadata"]))
+
+        # Try compression preset first (e.g., "8x")
+        if "compression_preset" in metadata:
+            return find_model_path(metadata["compression_preset"])
+
+        # Try checkpoint directory name
+        if "model_checkpoint" in metadata:
+            return find_model_path(metadata["model_checkpoint"])
+
+    except Exception:
+        pass
+    return None
+
+
 def decompress_command(args: argparse.Namespace) -> int:
     """Execute the decompress command."""
     # Validate input files exist
@@ -636,22 +718,26 @@ def decompress_command(args: argparse.Namespace) -> int:
         console.print("[red]Error: No input files specified[/red]")
         return EXIT_FILE_ERROR
 
-    # Validate model exists
-    if not os.path.exists(args.model):
-        console.print(f"[red]Error: Model not found: {args.model}[/red]")
-        return EXIT_MODEL_ERROR
+    # If model specified, validate it exists
+    if args.model:
+        try:
+            model_path = find_model_path(args.model)
+        except FileNotFoundError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            return EXIT_MODEL_ERROR
 
-    # Load model
-    try:
-        console.print(f"[dim]Loading model: {args.model}[/dim]")
-        compressor = SARCompressor(model_path=args.model)
-        console.print(
-            f"[dim]Device: {compressor.device}, "
-            f"Batch size: {compressor.batch_size}[/dim]"
-        )
-    except Exception as e:
-        console.print(f"[red]Error loading model: {e}[/red]")
-        return EXIT_MODEL_ERROR
+    # Cache compressors by model path to avoid reloading
+    compressor_cache = {}
+
+    def get_compressor(model_path: str) -> SARCompressor:
+        if model_path not in compressor_cache:
+            console.print(f"[dim]Loading model: {Path(model_path).parent.name}[/dim]")
+            compressor_cache[model_path] = SARCompressor(model_path=model_path)
+            console.print(
+                f"[dim]Device: {compressor_cache[model_path].device}, "
+                f"Batch size: {compressor_cache[model_path].batch_size}[/dim]"
+            )
+        return compressor_cache[model_path]
 
     # Process files
     results = []
@@ -672,6 +758,20 @@ def decompress_command(args: argparse.Namespace) -> int:
                 output_path = input_file.with_suffix(".tif")
 
             try:
+                # Determine model: CLI arg or auto-detect from NPZ
+                if args.model:
+                    file_model_path = model_path
+                else:
+                    file_model_path = get_model_from_npz(input_file)
+                    if file_model_path is None:
+                        console.print(
+                            f"[red]Error: Cannot auto-detect model for {input_file.name}. "
+                            f"Use --model to specify.[/red]"
+                        )
+                        return EXIT_MODEL_ERROR
+
+                compressor = get_compressor(file_model_path)
+
                 stats = decompress_file(
                     str(input_file),
                     str(output_path),
@@ -726,8 +826,7 @@ def main() -> int:
 
     # Handle --version flag
     if args.version:
-        model_path = DEFAULT_MODEL_PATH
-        show_version(model_path)
+        show_version()
         return EXIT_SUCCESS
 
     # If no command, show help

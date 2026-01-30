@@ -338,6 +338,10 @@ def write_cog(
                     if desc:
                         mem.set_band_description(i, desc)
 
+            # Write GCPs if present (Sentinel-1 SAFE format)
+            if metadata.gcps is not None and len(metadata.gcps) > 0:
+                mem.gcps = (metadata.gcps, metadata.gcps_crs)
+
         # Use deflate profile for COG
         cog_profile = cog_profiles.get('deflate')
 

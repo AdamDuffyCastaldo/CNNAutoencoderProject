@@ -338,6 +338,9 @@ class SARCompressor:
         """
         Decompress latent representation back to SAR image.
 
+        Uses streaming reconstruction to avoid holding all decoded tiles in memory.
+        This enables processing of very large images (10,000+ tiles).
+
         Args:
             latent_patches: Compressed latent patches (N, C, 16, 16)
             metadata: Decompression metadata from compress()
@@ -346,19 +349,68 @@ class SARCompressor:
         Returns:
             Reconstructed SAR image (linear intensity)
         """
-        # Process through decoder
-        decoded_tiles = self._process_tiles_batched(
-            latent_patches,
-            encode=False,
-            progress_callback=progress_callback
-        )
+        # Extract reconstruction parameters
+        n_rows, n_cols = metadata['grid_shape']
+        padded_shape = metadata['padded_shape']
+        original_shape = metadata['original_shape']
+        tile_size = metadata['tile_size']
+        stride = metadata['stride']
+        padding = metadata['padding']
 
-        # Reconstruct full image with blending
-        reconstructed_normalized = reconstruct_from_tiles(
-            decoded_tiles,
-            metadata,
-            self.blend_weights
-        )
+        # Initialize output accumulators (streaming - no need for all tiles in memory)
+        output = np.zeros(padded_shape, dtype=np.float32)
+        weight_sum = np.zeros(padded_shape, dtype=np.float32)
+
+        # Process in batches, streaming directly to output
+        n_tiles = latent_patches.shape[0]
+        n_batches = (n_tiles + self.batch_size - 1) // self.batch_size
+        use_amp = self.device.type == 'cuda'
+
+        for batch_idx in range(n_batches):
+            # Get batch of latent patches
+            start_idx = batch_idx * self.batch_size
+            end_idx = min(start_idx + self.batch_size, n_tiles)
+            batch = latent_patches[start_idx:end_idx]
+
+            # Decode batch on GPU
+            batch_tensor = torch.from_numpy(batch).to(self.device)
+
+            with torch.no_grad():
+                if use_amp:
+                    with torch.amp.autocast('cuda'):
+                        decoded_batch = self.model.decode(batch_tensor)
+                else:
+                    decoded_batch = self.model.decode(batch_tensor)
+
+            # Convert to numpy and remove channel dim: (N, 1, H, W) -> (N, H, W)
+            decoded_np = decoded_batch.cpu().numpy().squeeze(1).astype(np.float32)
+
+            # Stream each tile directly into output buffer
+            for i in range(decoded_np.shape[0]):
+                # Calculate tile position in grid
+                grid_idx = start_idx + i
+                row = grid_idx // n_cols
+                col = grid_idx % n_cols
+
+                y = row * stride
+                x = col * stride
+
+                # Accumulate weighted tile
+                tile = decoded_np[i]
+                output[y:y + tile_size, x:x + tile_size] += tile * self.blend_weights
+                weight_sum[y:y + tile_size, x:x + tile_size] += self.blend_weights
+
+            # Progress callback
+            if progress_callback is not None:
+                progress_callback(batch_idx + 1, n_batches)
+
+        # Normalize by accumulated weights
+        output = np.divide(output, weight_sum, where=weight_sum > 0, out=output)
+
+        # Remove padding to get original size
+        (top_pad, bottom_pad), (left_pad, right_pad) = padding
+        orig_H, orig_W = original_shape
+        reconstructed_normalized = output[top_pad:top_pad + orig_H, left_pad:left_pad + orig_W]
 
         # Inverse preprocess to get linear SAR values
         reconstructed = self.inverse_preprocess(reconstructed_normalized)
