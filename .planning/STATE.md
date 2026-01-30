@@ -6,15 +6,15 @@
 
 **Core Value:** Achieve maximum compression ratio while preserving SAR image quality sufficient for downstream analysis.
 
-**Current Focus:** Phase 6.1 (Fair Bitrate Comparison) - Plan 01 complete
+**Current Focus:** Phase 6.1 (Fair Bitrate Comparison) - Plan 02 complete
 
 ---
 
 ## Current Position
 
 **Phase:** 6.1 of 7 (Fair Bitrate Comparison) - IN PROGRESS
-**Plan:** 01 of ?? (entropy-based bitrate calculation complete)
-**Status:** Plan 01 complete - ready for Plan 02
+**Plan:** 02 of 03 (bitrate-matched evaluation complete)
+**Status:** Plan 02 complete - ready for Plan 03 (report update)
 
 **Progress:**
 ```
@@ -24,14 +24,14 @@ Phase 3: SAR Evaluation     [##########] 100%
 Phase 4: Architecture       [##########] 100%
 Phase 5: Full Inference     [##########] 100%
 Phase 6: Final Experiments  [##########] 100%
-Phase 6.1: Fair Bitrate     [##--------] 20%     <- IN PROGRESS
+Phase 6.1: Fair Bitrate     [######----] 67%     <- IN PROGRESS
 Phase 7: Deployment         [----------] 0%
 ```
 
 **Phase 6.1 Progress:**
 - [x] Plan 01: Entropy-based bitrate calculation module
-- [ ] Plan 02: JPEG-2000 R-D curve generation
-- [ ] Plan 03: Bitrate-matched comparison and report update
+- [x] Plan 02: JPEG-2000 R-D curve and bitrate-matched comparison
+- [ ] Plan 03: Report update with new conclusions
 
 **Phase 6 Progress (Complete):**
 - [x] Plan 01: Checkpoint verification and training setup
@@ -40,38 +40,33 @@ Phase 7: Deployment         [----------] 0%
 
 ---
 
-## Performance Metrics (Updated from Evaluation Sweep)
+## Performance Metrics (Updated from Bitrate-Matched Evaluation)
 
-| Metric | Target | ResNet 4x | ResNet 8x | ResNet 16x | Status |
-|--------|--------|-----------|-----------|------------|--------|
-| PSNR | >25 dB | 24.95 dB | 23.13 dB | 20.52 dB | 4x meets target |
-| SSIM | >0.85 | 0.9074 | 0.8568 | 0.7536 | 4x, 8x meet target |
-| ENL ratio | 0.8-1.2 | 1.03 | 1.10 | 1.01 | All OK |
-| EPI | >0.85 | 0.955 | 0.929 | 0.886 | All meet target |
+### Fair Comparison at Matched Bitrates
 
-### Rate-Distortion Comparison (Evaluation Sweep Results)
+| Model | BPP | AE PSNR | JP2 PSNR | Diff | SSIM Diff |
+|-------|-----|---------|----------|------|-----------|
+| ResNet 4x | 1.53 | 25.56 | 28.77 | **-3.22 dB** | -0.035 |
+| ResNet 8x | 0.89 | 23.78 | 25.19 | **-1.42 dB** | -0.001 |
+| ResNet 16x | 0.44 | 21.20 | 22.53 | **-1.33 dB** | +0.040 |
+| Baseline 4x | 1.77 | 24.78 | 30.20 | -5.42 dB | -0.097 |
+| Baseline 8x | 0.88 | 21.67 | 25.17 | -3.50 dB | -0.160 |
+| Baseline 16x | 0.44 | 19.43 | 22.52 | -3.10 dB | -0.114 |
 
-| Model | Ratio | PSNR (dB) | SSIM | EPI | Notes |
-|-------|-------|-----------|------|-----|-------|
-| resnet_4x | 4x | 24.95 | 0.9074 | 0.9550 | Best autoencoder |
-| baseline_4x | 4x | 24.41 | 0.8714 | 0.9460 | |
-| jpeg2000_4x | 4x | 53.21 | 0.9999 | 1.0000 | Near-lossless |
-| resnet_8x | 8x | 23.13 | 0.8568 | 0.9291 | Good quality |
-| baseline_8x | 8x | 21.27 | 0.7182 | 0.8774 | |
-| jpeg2000_8x | 8x | 41.24 | 0.9975 | 0.9993 | |
-| resnet_16x | 16x | 20.52 | 0.7536 | 0.8865 | Acceptable |
-| baseline_16x | 16x | 18.81 | 0.6095 | 0.8434 | Below target |
-| jpeg2000_16x | 16x | 30.92 | 0.9691 | 0.9909 | |
+**Key insights from fair comparison:**
+- ResNet models are competitive with JPEG-2000 at matched bitrates
+- **ResNet 16x only 1.33 dB below JPEG-2000** at same 0.44 BPP
+- Gap narrows at lower bitrates (higher compression)
+- Baseline models are 3-5 dB worse than JPEG-2000
+- At 16x compression, ResNet SSIM actually beats JPEG-2000 (+0.040)
 
-**Key insights:**
-- ResNet consistently outperforms baseline (+0.5 to +1.9 dB)
-- ResNet 8x quality similar to baseline 4x at 2x more compression
-- JPEG-2000 vastly outperforms autoencoders in raw metrics
-- **Issue identified:** "Compression ratio" means different things:
-  - Autoencoders: geometric latent reduction (256×256→16×16×C)
-  - JPEG-2000: actual file size ratio with entropy coding
-- **8-bit evaluation (reports/8bit/):** Even with matched quantization, JPEG-2000 still wins
-- **Next step:** Compare at matched bits-per-pixel (Phase 6.1)
+### Entropy-Based BPP vs Geometric BPP
+
+| Model | Geometric BPP | Actual BPP | Reduction |
+|-------|---------------|------------|-----------|
+| 4x models | 2.0 | 1.53-1.77 | 12-23% |
+| 8x models | 1.0 | 0.88-0.89 | 11-12% |
+| 16x models | 0.5 | 0.44 | 12% |
 
 ### Best Checkpoints (All 6)
 
@@ -123,6 +118,9 @@ Phase 7: Deployment         [----------] 0%
 | **Per-channel quantization** | Different channels have different distributions | Preserves more precision |
 | **Entropy base=2** | scipy.stats.entropy with base=2 for bits | Standard learned compression practice |
 | **64-bit overhead per channel** | 32-bit float x 2 (min/max) | Include storage cost for quantization params |
+| **Quality from quantized latent** | Entropy assumes quantized storage; quality must match | Fair comparison metric |
+| **Log-spaced JPEG-2000 quality** | Even BPP coverage for smooth R-D interpolation | 23 points, 0.03-6.4 BPP range |
+| **Linear R-D interpolation** | Simple, robust for dense curve | scipy.interpolate.interp1d |
 
 ### Technical Notes
 
@@ -137,6 +135,7 @@ Phase 7: Deployment         [----------] 0%
 - **Tiling:** Cosine-squared blending with offset padding, <1e-7 reconstruction error
 - **SARCompressor:** Full pipeline with batched GPU inference, AMP support, progress callbacks
 - **CLI:** sarcodec compress/decompress with rich progress bars, exit codes
+- **Bitrate-matched evaluation:** 23-point JPEG-2000 R-D curve, entropy-based autoencoder BPP
 
 ### Blockers
 
@@ -154,26 +153,28 @@ Phase 7: Deployment         [----------] 0%
 
 ### Last Session
 
-- **Date:** 2026-01-29
-- **Activity:** Executed Plan 06.1-01 (Entropy-Based Bitrate Calculation)
+- **Date:** 2026-01-30
+- **Activity:** Executed Plan 06.1-02 (Bitrate-Matched Evaluation)
 - **Outcome:**
-  - Implemented src/evaluation/bitrate.py (732 lines)
-  - Per-channel quantization and dequantization functions
-  - Shannon entropy estimation using scipy.stats.entropy(base=2)
-  - Validated on real ResNet 16x model latents
-  - Entropy BPP = 0.45 vs Geometric BPP = 2.0 (77% reduction)
-  - Quantization degradation negligible (<0.01 dB)
+  - Created scripts/run_bitrate_matched_evaluation.py (732 lines)
+  - Generated 23-point JPEG-2000 R-D curve (0.03-6.4 BPP)
+  - Computed entropy-based BPP for all 6 autoencoders
+  - Created bitrate-matched comparison showing ResNet within 1.3-3.2 dB of JPEG-2000
+  - Generated R-D figures and summary CSV
 
 ### Next Session
 
-- **Priority:** Continue Phase 6.1 (Plan 02 - JPEG-2000 R-D curve)
-- **Phase 6.1-01 outputs ready:**
-  - `src/evaluation/bitrate.py` - Entropy-based BPP calculation
-  - Functions: quantize_latent, dequantize_latent, estimate_latent_entropy, compute_latent_bpp
-- **Expected Phase 6.1-02 work:**
-  - Generate fine-grained JPEG-2000 R-D curve (20+ quality points)
-  - Interpolate to match autoencoder BPP
-  - Create bitrate-matched comparison
+- **Priority:** Continue Phase 6.1 (Plan 03 - Report Update)
+- **Phase 6.1-02 outputs ready:**
+  - `reports/bitrate_matched/data/autoencoder_bpp.json` - Actual BPP values
+  - `reports/bitrate_matched/data/jpeg2000_rd_curve.json` - R-D reference data
+  - `reports/bitrate_matched/data/bitrate_matched_results.json` - Comparison results
+  - `reports/bitrate_matched/figures/*.png` - R-D curve figures
+  - `reports/bitrate_matched/tables/bitrate_matched_summary.csv` - Summary table
+- **Expected Phase 6.1-03 work:**
+  - Update final_comparison.md with bitrate-matched conclusions
+  - Add new R-D figures to report
+  - Update executive summary with fair comparison results
 
 ---
 
@@ -192,6 +193,13 @@ Phase 7: Deployment         [----------] 0%
 - `reports/tables/results_summary.csv` - Summary table
 - `reports/tables/statistical_tests.csv` - Statistical significance tests
 
+**Bitrate-Matched Results:**
+- `reports/bitrate_matched/data/autoencoder_bpp.json` - Entropy-based BPP
+- `reports/bitrate_matched/data/jpeg2000_rd_curve.json` - 23-point R-D curve
+- `reports/bitrate_matched/data/bitrate_matched_results.json` - Fair comparison
+- `reports/bitrate_matched/figures/rd_curve_bitrate_matched_*.png` - R-D figures
+- `reports/bitrate_matched/tables/bitrate_matched_summary.csv` - Comparison table
+
 **Final Report:**
 - `reports/final_comparison.ipynb` - Reproducible analysis notebook
 - `reports/final_comparison.md` - Markdown report with executive summary
@@ -207,8 +215,9 @@ Phase 7: Deployment         [----------] 0%
 - Training: `src/training/trainer.py`
 - Evaluation metrics: `src/evaluation/metrics.py`
 - Codec baselines: `src/evaluation/codec_baselines.py`
-- **Bitrate estimation: `src/evaluation/bitrate.py`** (NEW)
-- **Evaluation sweep: `scripts/run_evaluation_sweep.py`**
+- Bitrate estimation: `src/evaluation/bitrate.py`
+- Evaluation sweep: `scripts/run_evaluation_sweep.py`
+- **Bitrate-matched evaluation: `scripts/run_bitrate_matched_evaluation.py`**
 - SARCompressor: `src/inference/compressor.py`
 - CLI: `scripts/sarcodec.py`
 
@@ -218,4 +227,4 @@ Phase 7: Deployment         [----------] 0%
 
 ---
 
-*State updated: 2026-01-29 (Phase 6.1 Plan 01 complete - entropy-based bitrate calculation)*
+*State updated: 2026-01-30 (Phase 6.1 Plan 02 complete - bitrate-matched evaluation)*
