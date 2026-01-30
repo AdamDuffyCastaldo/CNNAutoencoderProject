@@ -1,0 +1,50 @@
+{
+  "baseline_4x": {
+    "ae_bpp": 1.7685836185954926,
+    "ae_psnr": 24.78227252960205,
+    "ae_ssim": 0.8559997363616274,
+    "jp2_psnr_at_bpp": 30.202430543608337,
+    "jp2_ssim_at_bpp": 0.9534299767585901,
+    "extrapolated": false
+  },
+  "baseline_8x": {
+    "ae_bpp": 0.884040415353558,
+    "ae_psnr": 21.671636295318603,
+    "ae_ssim": 0.6861016193948382,
+    "jp2_psnr_at_bpp": 25.1713535312541,
+    "jp2_ssim_at_bpp": 0.8465611471247001,
+    "extrapolated": false
+  },
+  "baseline_16x": {
+    "ae_bpp": 0.4410964283499639,
+    "ae_psnr": 19.425800228118895,
+    "ae_ssim": 0.5855942210634764,
+    "jp2_psnr_at_bpp": 22.520978954076966,
+    "jp2_ssim_at_bpp": 0.6992972112504237,
+    "extrapolated": false
+  },
+  "resnet_4x": {
+    "ae_bpp": 1.5322558491223686,
+    "ae_psnr": 25.55544509887695,
+    "ae_ssim": 0.899329005335432,
+    "jp2_psnr_at_bpp": 28.774419855226277,
+    "jp2_ssim_at_bpp": 0.9342644382903055,
+    "extrapolated": false
+  },
+  "resnet_8x": {
+    "ae_bpp": 0.8882820249792245,
+    "ae_psnr": 23.77938632965088,
+    "ae_ssim": 0.8468563532776173,
+    "jp2_psnr_at_bpp": 25.194777932938546,
+    "jp2_ssim_at_bpp": 0.8473550645435303,
+    "extrapolated": false
+  },
+  "resnet_16x": {
+    "ae_bpp": 0.44250181556197826,
+    "ae_psnr": 21.20321378707886,
+    "ae_ssim": 0.7399851739815138,
+    "jp2_psnr_at_bpp": 22.529299767472217,
+    "jp2_ssim_at_bpp": 0.6999287396644955,
+    "extrapolated": false
+  }
+}
