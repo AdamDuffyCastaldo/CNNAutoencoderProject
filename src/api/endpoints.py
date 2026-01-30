@@ -195,8 +195,23 @@ async def decode_latent(
         with MemoryFile() as memfile:
             with memfile.open(**profile) as dst:
                 dst.write(reconstructed, 1)
-                if geo_metadata and geo_metadata.get('tags'):
-                    dst.update_tags(**geo_metadata['tags'])
+                if geo_metadata:
+                    if geo_metadata.get('tags'):
+                        dst.update_tags(**geo_metadata['tags'])
+                    # Write GCPs if present (Sentinel-1 SAFE format)
+                    if geo_metadata.get('gcps'):
+                        from rasterio.control import GroundControlPoint
+                        from rasterio.crs import CRS
+                        gcps = [
+                            GroundControlPoint(
+                                row=g['row'], col=g['col'],
+                                x=g['x'], y=g['y'], z=g.get('z', 0),
+                                id=g.get('id', '')
+                            )
+                            for g in geo_metadata['gcps']
+                        ]
+                        gcps_crs = CRS.from_wkt(geo_metadata['gcps_crs']) if geo_metadata.get('gcps_crs') else None
+                        dst.gcps = (gcps, gcps_crs)
             output_buffer.write(memfile.read())
 
         output_buffer.seek(0)
@@ -243,11 +258,24 @@ async def decompress(
 # Helper functions for geo metadata handling
 def _extract_geo_metadata(src):
     """Extract metadata from rasterio dataset."""
+    # Handle GCPs (used by Sentinel-1 SAFE format)
+    gcps = None
+    gcps_crs = None
+    if src.gcps[0]:  # gcps returns (gcps_list, crs)
+        gcps_list, gcps_crs_obj = src.gcps
+        gcps = [
+            {'col': g.col, 'row': g.row, 'x': g.x, 'y': g.y, 'z': g.z, 'id': g.id}
+            for g in gcps_list
+        ]
+        gcps_crs = gcps_crs_obj.to_wkt() if gcps_crs_obj else None
+
     return {
         'crs': src.crs.to_wkt() if src.crs else None,
         'transform': tuple(src.transform)[:6] if src.transform else None,
         'nodata': src.nodata,
         'tags': dict(src.tags()),
+        'gcps': gcps,
+        'gcps_crs': gcps_crs,
     }
 
 
@@ -260,6 +288,8 @@ def _serialize_geo_metadata(meta):
         'transform': list(meta['transform']) if meta.get('transform') else None,
         'nodata': float(meta['nodata']) if meta.get('nodata') is not None else None,
         'tags': meta.get('tags', {}),
+        'gcps': meta.get('gcps'),
+        'gcps_crs': meta.get('gcps_crs'),
     }
 
 
@@ -272,4 +302,6 @@ def _deserialize_geo_metadata(data):
         'transform': tuple(data['transform']) if data.get('transform') else None,
         'nodata': data.get('nodata'),
         'tags': data.get('tags', {}),
+        'gcps': data.get('gcps'),
+        'gcps_crs': data.get('gcps_crs'),
     }
