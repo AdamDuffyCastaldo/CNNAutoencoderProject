@@ -9,8 +9,8 @@ This script provides comprehensive evaluation of trained models including:
 - JSON output for reproducible experiments
 
 Usage:
-    # Basic evaluation
-    python scripts/evaluate_model.py --checkpoint notebooks/checkpoints/resnet_lite_v2_c16/best.pth
+    # Basic evaluation (use actual checkpoint path)
+    python scripts/evaluate_model.py --checkpoint notebooks/checkpoints/resnet_c16_b64_cr16x_*/best.pth
 
     # With codec comparison
     python scripts/evaluate_model.py --checkpoint path/to/best.pth --compare-codecs

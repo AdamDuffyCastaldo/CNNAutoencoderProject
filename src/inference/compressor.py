@@ -528,16 +528,20 @@ def test_compressor():
 
     print("Testing SARCompressor...")
 
-    # Find checkpoint
-    checkpoint_path = os.path.join(
+    # Find checkpoint - use glob to find any ResNet 16x checkpoint
+    import glob
+    checkpoint_pattern = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        'notebooks', 'checkpoints', 'resnet_lite_v2_c16', 'best.pth'
+        'notebooks', 'checkpoints', 'resnet_c16_b64_cr16x_*', 'best.pth'
     )
+    matches = glob.glob(checkpoint_pattern)
 
-    if not os.path.exists(checkpoint_path):
-        print(f"  Checkpoint not found at: {checkpoint_path}")
+    if not matches:
+        print(f"  No checkpoint found matching: {checkpoint_pattern}")
         print("  Skipping test.")
         return
+
+    checkpoint_path = matches[0]  # Use first match
 
     print(f"  Loading checkpoint: {checkpoint_path}")
 

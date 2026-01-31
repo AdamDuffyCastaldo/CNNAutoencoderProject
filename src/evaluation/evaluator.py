@@ -45,9 +45,9 @@ class Evaluator:
         >>> model = ResNetAutoencoder(latent_channels=16)
         >>> model.load_state_dict(torch.load('best.pth')['model_state_dict'])
         >>> evaluator = Evaluator(model, device='cuda')
-        >>> evaluator.model_name = 'resnet_lite_v2_c16'
+        >>> evaluator.model_name = 'resnet_c16_b64_cr16x'
         >>> results = evaluator.evaluate_dataset(test_loader)
-        >>> evaluator.save_results(results, 'evaluations', 'resnet_lite_v2_c16')
+        >>> evaluator.save_results(results, 'evaluations', 'resnet_c16_b64_cr16x')
     """
 
     def __init__(

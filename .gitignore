@@ -81,3 +81,4 @@ ff7a_output.npz
 ff7a_output.tiff.aux.xml
 original_preview.tif
 reconstructed.tiff
+notebooks/test_input.tif
